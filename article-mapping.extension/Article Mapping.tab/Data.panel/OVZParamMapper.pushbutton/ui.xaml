@@ -216,11 +216,21 @@
                                 <Grid Margin="0,0,8,4">
                                     <TextBox x:Name="target_box" Width="320" Padding="6,3,22,3" BorderBrush="{StaticResource Line}"
                                              ToolTip="Parameter to fill (text, number, yes/no). Type to search. '(type)' = type parameter (one value per type)."/>
-                                    <TextBlock x:Name="target_arrow" Text="&#x25BE;" Foreground="{StaticResource Muted}"
-                                               HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,4,0"
-                                               Padding="4,0" Background="Transparent" Cursor="Hand"/>
+                                    <!-- flat arrow button; not focusable so the typing focus stays in target_box -->
+                                    <Button x:Name="target_arrow" Content="&#x25BE;" Foreground="{StaticResource Muted}"
+                                            HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,3,0"
+                                            Padding="5,0" Cursor="Hand" Focusable="False" ToolTip="Show all parameters">
+                                        <Button.Template>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border Background="Transparent" Padding="{TemplateBinding Padding}">
+                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Border>
+                                            </ControlTemplate>
+                                        </Button.Template>
+                                    </Button>
+                                    <!-- StaysOpen True: script.py closes it (choice, Escape, focus leaves, window moves) -->
                                     <Popup x:Name="target_popup" PlacementTarget="{Binding ElementName=target_box}" Placement="Bottom"
-                                           StaysOpen="False" AllowsTransparency="True">
+                                           StaysOpen="True" AllowsTransparency="True">
                                         <Border Background="White" BorderBrush="{StaticResource Line}" BorderThickness="1">
                                             <!-- not focusable: the typing focus stays in target_box -->
                                             <ListBox x:Name="target_list" MaxHeight="400" BorderThickness="0" Focusable="False"

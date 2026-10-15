@@ -10,7 +10,7 @@ import datetime
 
 import clr
 import System
-from System import Tuple, DBNull
+from System import Tuple, DBNull, Action
 from pyrevit import revit, DB, forms, script, HOST_APP
 from Autodesk.Revit.UI import IExternalEventHandler, ExternalEvent
 
@@ -647,12 +647,15 @@ class OvzWindow(forms.WPFWindow):
                             (self.hide_noparam_cb.Click, self.on_hide_noparam),
                             (self.art_search.TextChanged, self.on_art_filter),
                             (self.target_box.PreviewMouseLeftButtonDown, self.on_target_mouse_down),
-                            (self.target_box.GotFocus, self.on_target_got_focus),
+                            (self.target_box.PreviewMouseLeftButtonUp, self.on_target_click),
+                            (self.target_box.GotKeyboardFocus, self.on_target_got_focus),
                             (self.target_box.TextChanged, self.on_target_text_changed),
                             (self.target_box.PreviewKeyDown, self.on_target_key),
-                            (self.target_box.LostFocus, self.on_target_lost_focus),
-                            (self.target_arrow.MouseLeftButtonDown, self.on_target_arrow),
+                            (self.target_box.LostKeyboardFocus, self.on_target_lost_focus),
+                            (self.target_arrow.Click, self.on_target_arrow),
                             (self.target_list.PreviewMouseLeftButtonUp, self.on_target_list_click),
+                            (self.LocationChanged, self.on_window_moved),
+                            (self.Deactivated, self.on_window_moved),
                             (self.value_cb.SelectionChanged, self.on_value_col_changed),
                             (self.sub_cb.SelectionChanged, self.on_art_filter),
                             (self.model_grid.AutoGeneratingColumn, self.on_auto_column),
@@ -952,9 +955,26 @@ class OvzWindow(forms.WPFWindow):
             self.target_box.Focus()
             e.Handled = True
 
+    def _later(self, func):
+        """Run func after the current mouse/focus event has finished."""
+        self.Dispatcher.BeginInvoke(Action(func))
+
+    def _open_full_target_list(self):
+        if not self.target_popup.IsOpen:
+            self._show_full_target_list()
+
+    def _close_target_popup(self):
+        """Close the list and put back the current parameter name."""
+        self.target_popup.IsOpen = False
+        self._set_target_text(self.target)
+
+    def on_target_click(self, sender, e):
+        # (when the list is already open, a click only moves the caret)
+        self._later(self._open_full_target_list)
+
     def on_target_got_focus(self, sender, e):
         self.target_box.SelectAll()
-        self._show_full_target_list()
+        self._later(self._open_full_target_list)
 
     def on_target_text_changed(self, sender, e):
         if self._setting_target or not self.target_box.IsKeyboardFocusWithin:
@@ -974,8 +994,7 @@ class OvzWindow(forms.WPFWindow):
         elif e.Key == Key.Tab:
             self._choose_highlighted_target()     # Tab still moves on to the next field
         elif e.Key == Key.Escape:
-            self.target_popup.IsOpen = False
-            self._set_target_text(self.target)
+            self._close_target_popup()
             self.target_box.SelectAll()
             e.Handled = True
 
@@ -986,18 +1005,26 @@ class OvzWindow(forms.WPFWindow):
             e.Handled = True
 
     def on_target_arrow(self, sender, e):
-        if not self.target_box.IsKeyboardFocusWithin:
-            self.target_box.Focus()               # GotFocus opens the full list
-        elif self.target_popup.IsOpen:
+        """Toggle the full list."""
+        if self.target_popup.IsOpen:
             self.target_popup.IsOpen = False
-        else:
-            self._show_full_target_list()
-        e.Handled = True
+            return
+        self.target_box.Focus()
+        self.target_box.SelectAll()
+        self._later(self._open_full_target_list)
 
     def on_target_lost_focus(self, sender, e):
-        # never leave half-typed text behind
-        self.target_popup.IsOpen = False
-        self._set_target_text(self.target)
+        # check once the new focus is known; never leave half-typed text behind
+        def check():
+            if not (self.target_box.IsKeyboardFocusWithin
+                    or self.target_list.IsKeyboardFocusWithin):
+                self._close_target_popup()
+        self._later(check)
+
+    def on_window_moved(self, sender, e):
+        # the list would stay behind on screen (StaysOpen), so close it
+        if self.target_popup.IsOpen:
+            self._close_target_popup()
 
     def _mkey(self, g, system=None):
         return make_key(g.category, g.family, g.type,
