@@ -359,6 +359,8 @@
                                                     <StackPanel Margin="12,4,0,0">
                                                         <Border Background="#E9E9E9" Padding="6,4">
                                                             <StackPanel Orientation="Horizontal">
+                                                                <TextBlock Text="{Binding Name.Item3}" Foreground="{StaticResource Muted}" FontSize="10.5"
+                                                                           Margin="0,0,10,0" VerticalAlignment="Center"/>
                                                                 <TextBlock Text="{Binding Name.Item1}" FontSize="12" FontWeight="SemiBold"
                                                                            Foreground="{StaticResource Ink}"/>
                                                             </StackPanel>
@@ -381,6 +383,8 @@
                                                     <StackPanel Margin="12,4,0,0">
                                                         <Border Background="#F4F4F4" Padding="6,4">
                                                             <StackPanel Orientation="Horizontal">
+                                                                <TextBlock Text="{Binding Name.Item3}" Foreground="{StaticResource Muted}" FontSize="10.5"
+                                                                           Margin="0,0,10,0" VerticalAlignment="Center"/>
                                                                 <TextBlock Text="{Binding Name.Item1}" FontSize="12" FontWeight="Normal"
                                                                            Foreground="{StaticResource Ink}"/>
                                                             </StackPanel>
@@ -403,6 +407,8 @@
                                                     <StackPanel Margin="12,4,0,0">
                                                         <Border Background="#FAFAFA" Padding="6,4">
                                                             <StackPanel Orientation="Horizontal">
+                                                                <TextBlock Text="{Binding Name.Item3}" Foreground="{StaticResource Muted}" FontSize="10.5"
+                                                                           Margin="0,0,10,0" VerticalAlignment="Center"/>
                                                                 <TextBlock Text="{Binding Name.Item1}" FontSize="12" FontWeight="Normal"
                                                                            Foreground="{StaticResource Ink}"/>
                                                             </StackPanel>

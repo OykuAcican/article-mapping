@@ -449,6 +449,8 @@ def gather_groups(extra_names, target=P_INST, split_names=()):
             g.extra_values = dict(zip(split_names, split_vals))
             g.classification = param_text(el, BIP.RBS_SYSTEM_CLASSIFICATION_PARAM)
             g.shape, g.diameter, g.width, g.height = shape_and_dims(el, size)
+            if not g.shape:
+                g.shape = connector_shape(el)       # fittings, accessories, terminals
             g.type_id = el_type.Id if el_type is not None else None
             _text_params(el, '', param_names)
             _all_params(el, '', all_names)
@@ -469,6 +471,47 @@ def gather_groups(extra_names, target=P_INST, split_names=()):
         for name in extra_names:
             g.extra.setdefault(name, set()).add(lookup_text(el, el_type, name))
     return groups, param_names, all_names
+
+
+DIAMETER_SIGNS = (unichr(0x00d8), unichr(0x00f8))     # Ø and ø (Revit writes "250ø")
+TIMES = unichr(0x00d7)                                 # ×
+
+
+def display_size(g):
+    """Size as shown in a group header (display only; g.size stays as it is):
+    DN20 -> DN20, round 100-125 -> Ø100-Ø125 mm, 500x200 -> 500 × 200 mm,
+    100 (shape unknown) -> 100 mm, empty -> (no size)."""
+    import re
+    s = (g.size or '').strip()
+    if not s:
+        return '(no size)'
+    if s.upper().startswith('DN'):
+        return s
+    if re.search(r'\d\s*[xX]\s*\d', s):
+        return re.sub(r'(\d)\s*[xX]\s*(?=\d)',
+                      lambda m: m.group(1) + u' ' + TIMES + u' ', s) + u' mm'
+    plain = s
+    for sign in DIAMETER_SIGNS:
+        plain = plain.replace(sign, '')
+    parts = [p.strip() for p in plain.split('-')]
+    numbers = all(re.match(r'^\d+(?:[.,]\d+)?$', p) for p in parts)
+    if not numbers:
+        return s
+    if g.shape == 'Round' or any(sign in s for sign in DIAMETER_SIGNS):
+        return u'-'.join(DIAMETER_SIGNS[0] + p for p in parts) + u' mm'
+    return u'-'.join(parts) + u' mm'
+
+
+def connector_shape(el):
+    """'Round' when every connector of a family instance (fitting, accessory,
+    air terminal...) is round, else ''."""
+    try:
+        cons = list(el.MEPModel.ConnectorManager.Connectors)
+        if cons and all(c.Shape == DB.ConnectorProfileType.Round for c in cons):
+            return 'Round'
+    except Exception:
+        pass
+    return ''
 
 
 def _num_key(text):
@@ -497,8 +540,7 @@ def group_value(g, field):
         return (v or '(no shape)', '%d %s' % (SHAPE_ORDER.get(v, 9), v))
     elif field == 'Size':
         v = g.size
-        return (u'Size: {}'.format(v) if v else '(no size)',
-                '%d %s' % (SHAPE_ORDER.get(g.shape, 9), _num_key(v)))
+        return (display_size(g), '%d %s' % (SHAPE_ORDER.get(g.shape, 9), _num_key(v)))
     elif field in ('Diameter', 'Width', 'Height'):
         n = {'Diameter': g.diameter, 'Width': g.width, 'Height': g.height}[field]
         if not n:
@@ -1143,9 +1185,12 @@ class OvzWindow(forms.WPFWindow):
                     n = counts[pre]
                     if lvl > 0:
                         count_text = ''         # sub-groups: the Elements column has the count
+                        # grey caption before the value: the field name ("size", "type")
+                        caption = split_target(fields[lvl])[0].lower()
                     else:
                         count_text = '(1 element)' if n == 1 else '({} elements)'.format(n)
-                    dr['k{}'.format(lvl)] = Tuple.Create(label, count_text)
+                        caption = ''
+                    dr['k{}'.format(lvl)] = Tuple.Create(label, count_text, caption)
                     dr['s{}'.format(lvl)] = vals[lvl][1]
                 else:
                     dr['k{}'.format(lvl)] = DBNull.Value
