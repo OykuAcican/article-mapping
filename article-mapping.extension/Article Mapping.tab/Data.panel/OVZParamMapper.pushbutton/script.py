@@ -497,7 +497,8 @@ def group_value(g, field):
         return (v or '(no shape)', '%d %s' % (SHAPE_ORDER.get(v, 9), v))
     elif field == 'Size':
         v = g.size
-        return (v or '(no size)', '%d %s' % (SHAPE_ORDER.get(g.shape, 9), _num_key(v)))
+        return (u'Size: {}'.format(v) if v else '(no size)',
+                '%d %s' % (SHAPE_ORDER.get(g.shape, 9), _num_key(v)))
     elif field in ('Diameter', 'Width', 'Height'):
         n = {'Diameter': g.diameter, 'Width': g.width, 'Height': g.height}[field]
         if not n:
