@@ -26,7 +26,7 @@ from System.Collections.Generic import List
 from System.Windows import DragDrop, DragDropEffects, DataFormats, SystemParameters
 from System.Windows.Controls import (DataGridRow, TextBlock, CheckBox, StackPanel, Expander,
                                      GroupItem, DataGridCell, Control)
-from System.Windows import Style, Setter
+from System.Windows import Style, Setter, Visibility
 from System.Windows.Media import SolidColorBrush, Color
 from System.Windows.Data import PropertyGroupDescription, CollectionViewGroup
 import System.Windows.Media
@@ -114,9 +114,10 @@ MODEL_COLS = ['Category', 'Family', 'Type', 'System type', 'Abbrev.', 'Size',
 # column order on screen (indexes into MODEL_COLS)
 DISPLAY_ORDER = [0, 1, 2, 11, 3, 4, 12, 5, 6, 7, 8, 9, 10]
 NONE_FIELD = '(none)'
-GROUP_FIELDS = ['Category', 'Family', 'Type', 'System classification', 'System type',
+# Category is always the first group level; these are the choices below it
+GROUP_FIELDS = ['Family', 'Type', 'System classification', 'System type',
                 'System abbreviation', 'Shape', 'Size', 'Diameter', 'Width', 'Height']
-DEFAULT_GROUPING = ['Category', 'System abbreviation', 'Shape', 'Size']
+DEFAULT_GROUPING = ['Type', 'System abbreviation', 'Size']
 SHAPE_ORDER = {'Round': 0, 'Rectangular': 1, 'Oval': 2}
 ART_COLS = ['Art_nr', 'Omschrijving', 'Unit', 'Discipline']
 HIDDEN_COLS = ('id', 'state', 'cat', 'hasparam',
@@ -535,9 +536,10 @@ class OvzWindow(forms.WPFWindow):
         self._own_selection = set()
         self._sel_callback = None
         self._loading_grouping = True
-        self._group_cbs = [self.group1_cb, self.group2_cb, self.group3_cb, self.group4_cb]
+        self._group_cbs = [self.group1_cb, self.group2_cb, self.group3_cb]
         saved = (config.get_option('ovz_grouping', '') or '').split(';')
-        if len(saved) != 4:
+        # older settings had 4 levels starting with Category: use the default then
+        if len(saved) != 3 or saved[0] == 'Category':
             saved = DEFAULT_GROUPING
         for cb, value in zip(self._group_cbs, saved):
             cb.ItemsSource = [NONE_FIELD] + GROUP_FIELDS
@@ -567,6 +569,8 @@ class OvzWindow(forms.WPFWindow):
                             (self.refresh_btn.Click, self.on_refresh),
                             (self.cat_all_btn.Click, self.on_cat_all),
                             (self.cat_none_btn.Click, self.on_cat_none),
+                            (self.collapse_all_btn.Click, self.on_collapse_all),
+                            (self.expand_all_btn.Click, self.on_expand_all),
                             (self.model_search.TextChanged, self.on_model_filter),
                             (self.only_empty_cb.Click, self.on_model_filter),
                             (self.only_unassigned_cb.Click, self.on_model_filter),
@@ -799,7 +803,7 @@ class OvzWindow(forms.WPFWindow):
 
     # -- grouping (like the Sorting/Grouping tab of a schedule) ---------------------
     def _grouping(self):
-        out = []
+        out = ['Category']
         for cb in self._group_cbs:
             f = cb.SelectedItem
             if f and f != NONE_FIELD and f not in out:
@@ -823,8 +827,11 @@ class OvzWindow(forms.WPFWindow):
             for lvl in range(4):
                 if lvl < len(fields):
                     pre = tuple(v[0] for v in vals[:lvl + 1])
-                    dr['k{}'.format(lvl)] = u'{}: {}   ({} elements)'.format(
-                        fields[lvl], vals[lvl][0], counts[pre])
+                    if lvl == 0:        # category: "AIR TERMINALS    63 elements"
+                        text = u'{}    {} elements'.format(vals[0][0].upper(), counts[pre])
+                    else:               # deeper: "o100_gen   9"
+                        text = u'{}   {}'.format(vals[lvl][0], counts[pre])
+                    dr['k{}'.format(lvl)] = text
                     dr['s{}'.format(lvl)] = vals[lvl][1]
                 else:
                     dr['k{}'.format(lvl)] = ''
@@ -848,6 +855,48 @@ class OvzWindow(forms.WPFWindow):
         self._fill_group_columns()
         self._apply_grouping()
         self._model_filter()
+
+    def _group_expanders(self):
+        """(level, Expander) of every group header that WPF has built (on screen)."""
+        out = []
+        todo = [self.model_grid]
+        while todo:
+            obj = todo.pop()
+            for i in range(VisualTreeHelper.GetChildrenCount(obj)):
+                child = VisualTreeHelper.GetChild(obj, i)
+                todo.append(child)
+                if not isinstance(child, GroupItem) or not VisualTreeHelper.GetChildrenCount(child):
+                    continue
+                exp = VisualTreeHelper.GetChild(child, 0)
+                if not isinstance(exp, Expander):
+                    continue
+                level = 0
+                up = find_ancestor(VisualTreeHelper.GetParent(child), GroupItem)
+                while up is not None:
+                    level += 1
+                    up = find_ancestor(VisualTreeHelper.GetParent(up), GroupItem)
+                out.append((level, exp))
+        return out
+
+    def _set_expanded(self, deep):
+        """Categories stay open; level 1 and deeper are opened (True) or closed (False)."""
+        # headers inside a group only exist after it is opened and laid out
+        for _ in range(len(self._grouping())):
+            changed = False
+            for level, exp in self._group_expanders():
+                want = True if level == 0 else deep
+                if exp.IsExpanded != want:
+                    exp.IsExpanded = want
+                    changed = True
+            if not changed:
+                break
+            self.model_grid.UpdateLayout()
+
+    def on_collapse_all(self, sender, e):
+        self._set_expanded(False)
+
+    def on_expand_all(self, sender, e):
+        self._set_expanded(True)
 
     def _groups_under(self, view_group):
         out = []
@@ -1106,6 +1155,10 @@ class OvzWindow(forms.WPFWindow):
             if col is not None:
                 col.DisplayIndex = pos
                 pos += 1
+        # the category is already shown in the group headers
+        cat_col = by_name.get('g0')
+        if cat_col is not None:
+            cat_col.Visibility = Visibility.Collapsed if self._grouping() else Visibility.Visible
 
     def on_model_filter(self, sender, e):
         self._model_filter()
