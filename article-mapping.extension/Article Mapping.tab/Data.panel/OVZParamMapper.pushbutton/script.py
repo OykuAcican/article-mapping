@@ -850,12 +850,12 @@ class OvzWindow(forms.WPFWindow):
             for lvl in range(4):
                 if lvl < len(fields):
                     pre = tuple(v[0] for v in vals[:lvl + 1])
-                    # the header shows the label, then the count in grey; equal
-                    # tuples (compared by value) fall in the same group
+                    # the header shows the label, then (category only) the count
+                    # in grey; equal tuples (compared by value) fall in the same group
                     label = vals[0][0].upper() if lvl == 0 else vals[lvl][0]
                     n = counts[pre]
-                    if lvl > 0 and n == counts[pre[:-1]]:
-                        count_text = ''         # same as the header above: don't repeat it
+                    if lvl > 0:
+                        count_text = ''         # sub-groups: the Elements column has the count
                     else:
                         count_text = '(1 element)' if n == 1 else '({} elements)'.format(n)
                     dr['k{}'.format(lvl)] = Tuple.Create(label, count_text)
