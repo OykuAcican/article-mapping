@@ -284,8 +284,12 @@
                                                               BorderBrush="{StaticResource Ink}" BorderThickness="0"
                                                               Padding="0" Margin="0,16,0,0">
                                                         <Expander.Header>
-                                                            <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="Bold"
-                                                                       Foreground="{StaticResource Ink}" Padding="2,2"/>
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <TextBlock Text="{Binding Name.Item1}" FontSize="13" FontWeight="Bold"
+                                                                           Foreground="{StaticResource Ink}" Padding="2,2"/>
+                                                                <TextBlock Text="{Binding Name.Item2}" FontSize="11" FontWeight="Normal"
+                                                                           Foreground="{StaticResource Muted}" Margin="12,0,0,0" VerticalAlignment="Center"/>
+                                                            </StackPanel>
                                                         </Expander.Header>
                                                         <!-- the rule under the header (full width) -->
                                                         <Border BorderBrush="{StaticResource Ink}" BorderThickness="0,1,0,0">
@@ -314,8 +318,12 @@
                                                 <ControlTemplate TargetType="GroupItem">
                                                     <StackPanel Margin="12,4,0,0">
                                                         <Border Background="#F4F4F4">
-                                                            <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold"
-                                                                       Foreground="{StaticResource Ink}" Padding="2,3"/>
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <TextBlock Text="{Binding Name.Item1}" FontSize="12" FontWeight="SemiBold"
+                                                                           Foreground="{StaticResource Ink}" Padding="2,3"/>
+                                                                <TextBlock Text="{Binding Name.Item2}" FontSize="11" FontWeight="Normal"
+                                                                           Foreground="{StaticResource Muted}" Margin="12,0,0,0" VerticalAlignment="Center"/>
+                                                            </StackPanel>
                                                         </Border>
                                                         <ItemsPresenter/>
                                                     </StackPanel>
@@ -334,8 +342,12 @@
                                                 <ControlTemplate TargetType="GroupItem">
                                                     <StackPanel Margin="12,4,0,0">
                                                         <Border Background="Transparent">
-                                                            <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Normal"
-                                                                       Foreground="{StaticResource Ink}" Padding="2,3"/>
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <TextBlock Text="{Binding Name.Item1}" FontSize="12" FontWeight="Normal"
+                                                                           Foreground="{StaticResource Ink}" Padding="2,3"/>
+                                                                <TextBlock Text="{Binding Name.Item2}" FontSize="11" FontWeight="Normal"
+                                                                           Foreground="{StaticResource Muted}" Margin="12,0,0,0" VerticalAlignment="Center"/>
+                                                            </StackPanel>
                                                         </Border>
                                                         <ItemsPresenter/>
                                                     </StackPanel>
@@ -354,8 +366,12 @@
                                                 <ControlTemplate TargetType="GroupItem">
                                                     <StackPanel Margin="12,4,0,0">
                                                         <Border Background="Transparent">
-                                                            <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Normal"
-                                                                       Foreground="{StaticResource Ink}" Padding="2,3"/>
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <TextBlock Text="{Binding Name.Item1}" FontSize="12" FontWeight="Normal"
+                                                                           Foreground="{StaticResource Ink}" Padding="2,3"/>
+                                                                <TextBlock Text="{Binding Name.Item2}" FontSize="11" FontWeight="Normal"
+                                                                           Foreground="{StaticResource Muted}" Margin="12,0,0,0" VerticalAlignment="Center"/>
+                                                            </StackPanel>
                                                         </Border>
                                                         <ItemsPresenter/>
                                                     </StackPanel>

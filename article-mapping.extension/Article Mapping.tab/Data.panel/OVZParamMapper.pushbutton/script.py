@@ -10,6 +10,7 @@ import datetime
 
 import clr
 import System
+from System import Tuple, DBNull
 from pyrevit import revit, DB, forms, script, HOST_APP
 from Autodesk.Revit.UI import IExternalEventHandler, ExternalEvent
 
@@ -120,6 +121,7 @@ GROUP_FIELDS = ['Family', 'Type', 'System classification', 'System type',
 DEFAULT_GROUPING = ['Type', 'System abbreviation', 'Size']
 SHAPE_ORDER = {'Round': 0, 'Rectangular': 1, 'Oval': 2}
 ART_COLS = ['Art_nr', 'Omschrijving', 'Unit', 'Discipline']
+GROUP_KEY_COLS = ('k0', 'k1', 'k2', 'k3')
 HIDDEN_COLS = ('id', 'state', 'cat', 'hasparam',
                'k0', 'k1', 'k2', 'k3', 's0', 's1', 's2', 's3')
 
@@ -712,7 +714,10 @@ class OvzWindow(forms.WPFWindow):
     def _build_model_table(self):
         dt = DataTable()
         for name in HIDDEN_COLS:
-            dt.Columns.Add(name)
+            if name in GROUP_KEY_COLS:      # (label, count text) tuples for the headers
+                dt.Columns.Add(name, clr.GetClrType(System.Object))
+            else:
+                dt.Columns.Add(name)
         cols = list(MODEL_COLS) + self.extra_names
         cols[8] = u'{} now'.format(self.target)
         cols[9] = 'New value'
@@ -827,14 +832,15 @@ class OvzWindow(forms.WPFWindow):
             for lvl in range(4):
                 if lvl < len(fields):
                     pre = tuple(v[0] for v in vals[:lvl + 1])
-                    if lvl == 0:        # category: "AIR TERMINALS    63 elements"
-                        text = u'{}    {} elements'.format(vals[0][0].upper(), counts[pre])
-                    else:               # deeper: "o100_gen   9"
-                        text = u'{}   {}'.format(vals[lvl][0], counts[pre])
-                    dr['k{}'.format(lvl)] = text
+                    # the header shows the label, then the count in grey; equal
+                    # tuples (compared by value) fall in the same group
+                    label = vals[0][0].upper() if lvl == 0 else vals[lvl][0]
+                    n = counts[pre]
+                    count_text = '1 element' if n == 1 else '{} elements'.format(n)
+                    dr['k{}'.format(lvl)] = Tuple.Create(label, count_text)
                     dr['s{}'.format(lvl)] = vals[lvl][1]
                 else:
-                    dr['k{}'.format(lvl)] = ''
+                    dr['k{}'.format(lvl)] = DBNull.Value
                     dr['s{}'.format(lvl)] = ''
 
     def _apply_grouping(self):
