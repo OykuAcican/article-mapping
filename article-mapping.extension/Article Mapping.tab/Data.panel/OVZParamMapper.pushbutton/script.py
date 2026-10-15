@@ -856,47 +856,33 @@ class OvzWindow(forms.WPFWindow):
         self._apply_grouping()
         self._model_filter()
 
-    def _group_expanders(self):
-        """(level, Expander) of every group header that WPF has built (on screen)."""
+    def _category_expanders(self):
+        """The Expander of every category header that WPF has built (on screen).
+        Only categories have one; sub-groups are plain header + rows."""
         out = []
         todo = [self.model_grid]
         while todo:
             obj = todo.pop()
             for i in range(VisualTreeHelper.GetChildrenCount(obj)):
                 child = VisualTreeHelper.GetChild(obj, i)
-                todo.append(child)
-                if not isinstance(child, GroupItem) or not VisualTreeHelper.GetChildrenCount(child):
+                if not isinstance(child, GroupItem):
+                    todo.append(child)
                     continue
-                exp = VisualTreeHelper.GetChild(child, 0)
-                if not isinstance(exp, Expander):
-                    continue
-                level = 0
-                up = find_ancestor(VisualTreeHelper.GetParent(child), GroupItem)
-                while up is not None:
-                    level += 1
-                    up = find_ancestor(VisualTreeHelper.GetParent(up), GroupItem)
-                out.append((level, exp))
+                # a category: don't look inside, its sub-groups have no Expander
+                if (VisualTreeHelper.GetChildrenCount(child)
+                        and find_ancestor(VisualTreeHelper.GetParent(child), GroupItem) is None):
+                    exp = VisualTreeHelper.GetChild(child, 0)
+                    if isinstance(exp, Expander):
+                        out.append(exp)
         return out
 
-    def _set_expanded(self, deep):
-        """Categories stay open; level 1 and deeper are opened (True) or closed (False)."""
-        # headers inside a group only exist after it is opened and laid out
-        for _ in range(len(self._grouping())):
-            changed = False
-            for level, exp in self._group_expanders():
-                want = True if level == 0 else deep
-                if exp.IsExpanded != want:
-                    exp.IsExpanded = want
-                    changed = True
-            if not changed:
-                break
-            self.model_grid.UpdateLayout()
-
     def on_collapse_all(self, sender, e):
-        self._set_expanded(False)
+        for exp in self._category_expanders():
+            exp.IsExpanded = False
 
     def on_expand_all(self, sender, e):
-        self._set_expanded(True)
+        for exp in self._category_expanders():
+            exp.IsExpanded = True
 
     def _groups_under(self, view_group):
         out = []

@@ -248,9 +248,9 @@
                                 <ComboBox x:Name="group2_cb" Width="160" Padding="6,3" Margin="0,0,4,4"/>
                                 <TextBlock Text="then" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="2,0,6,4"/>
                                 <ComboBox x:Name="group3_cb" Width="160" Padding="6,3" Margin="0,0,14,4"/>
-                                <Button x:Name="collapse_all_btn" Content="Collapse all" Style="{StaticResource SecondaryBtn}"
-                                        Padding="8,2" Margin="0,0,6,4" ToolTip="Keep the categories open, close everything below"/>
-                                <Button x:Name="expand_all_btn" Content="Expand all" Style="{StaticResource SecondaryBtn}"
+                                <Button x:Name="collapse_all_btn" Content="Collapse categories" Style="{StaticResource SecondaryBtn}"
+                                        Padding="8,2" Margin="0,0,6,4"/>
+                                <Button x:Name="expand_all_btn" Content="Expand categories" Style="{StaticResource SecondaryBtn}"
                                         Padding="8,2" Margin="0,0,0,4"/>
                             </WrapPanel>
                         </StackPanel>
@@ -284,7 +284,7 @@
                                                               BorderBrush="{StaticResource Ink}" BorderThickness="0"
                                                               Padding="0" Margin="0,16,0,0">
                                                         <Expander.Header>
-                                                            <TextBlock Text="{Binding Name}" FontSize="15" FontWeight="Bold"
+                                                            <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="Bold"
                                                                        Foreground="{StaticResource Ink}" Padding="2,2"/>
                                                         </Expander.Header>
                                                         <!-- the rule under the header (full width) -->
@@ -304,6 +304,7 @@
                                     </Style>
                                 </GroupStyle.ContainerStyle>
                             </GroupStyle>
+                            <!-- Levels 1-3 are not collapsible: header + rows, always visible -->
                             <!-- Level 1: grey band, semibold -->
                             <GroupStyle>
                                 <GroupStyle.ContainerStyle>
@@ -311,16 +312,13 @@
                                         <Setter Property="Template">
                                             <Setter.Value>
                                                 <ControlTemplate TargetType="GroupItem">
-                                                    <Expander IsExpanded="True" Background="#F4F4F4" BorderThickness="0"
-                                                              Padding="0" Margin="12,4,0,0">
-                                                        <Expander.Header>
+                                                    <StackPanel Margin="12,4,0,0">
+                                                        <Border Background="#F4F4F4">
                                                             <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold"
                                                                        Foreground="{StaticResource Ink}" Padding="2,3"/>
-                                                        </Expander.Header>
-                                                        <Border Background="White">
-                                                            <ItemsPresenter/>
                                                         </Border>
-                                                    </Expander>
+                                                        <ItemsPresenter/>
+                                                    </StackPanel>
                                                 </ControlTemplate>
                                             </Setter.Value>
                                         </Setter>
@@ -334,14 +332,13 @@
                                         <Setter Property="Template">
                                             <Setter.Value>
                                                 <ControlTemplate TargetType="GroupItem">
-                                                    <Expander IsExpanded="True" Background="Transparent" BorderThickness="0"
-                                                              Padding="0" Margin="12,4,0,0">
-                                                        <Expander.Header>
+                                                    <StackPanel Margin="12,4,0,0">
+                                                        <Border Background="Transparent">
                                                             <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Normal"
                                                                        Foreground="{StaticResource Ink}" Padding="2,3"/>
-                                                        </Expander.Header>
+                                                        </Border>
                                                         <ItemsPresenter/>
-                                                    </Expander>
+                                                    </StackPanel>
                                                 </ControlTemplate>
                                             </Setter.Value>
                                         </Setter>
@@ -355,14 +352,13 @@
                                         <Setter Property="Template">
                                             <Setter.Value>
                                                 <ControlTemplate TargetType="GroupItem">
-                                                    <Expander IsExpanded="True" Background="Transparent" BorderThickness="0"
-                                                              Padding="0" Margin="12,4,0,0">
-                                                        <Expander.Header>
+                                                    <StackPanel Margin="12,4,0,0">
+                                                        <Border Background="Transparent">
                                                             <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Normal"
                                                                        Foreground="{StaticResource Ink}" Padding="2,3"/>
-                                                        </Expander.Header>
+                                                        </Border>
                                                         <ItemsPresenter/>
-                                                    </Expander>
+                                                    </StackPanel>
                                                 </ControlTemplate>
                                             </Setter.Value>
                                         </Setter>
