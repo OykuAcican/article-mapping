@@ -1,0 +1,389 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="OVZ Param Mapper" Width="1500" Height="860" MinWidth="1100" MinHeight="600"
+        WindowStartupLocation="CenterScreen" ShowInTaskbar="False"
+        FontFamily="Segoe UI" FontSize="12" Background="{DynamicResource Paper}">
+
+    <Window.Resources>
+        <!-- OVERZICHT house style: black type on white, red as the one accent.
+             Change the red here (Brand) if the exact company colour differs. -->
+        <SolidColorBrush x:Key="Brand" Color="#EF4136"/>
+        <SolidColorBrush x:Key="BrandTint" Color="#FDE8E7"/>
+        <SolidColorBrush x:Key="Navy" Color="#111111"/>
+        <SolidColorBrush x:Key="Accent" Color="#EF4136"/>
+        <SolidColorBrush x:Key="Ink" Color="#111111"/>
+        <SolidColorBrush x:Key="Muted" Color="#6E6E6E"/>
+        <SolidColorBrush x:Key="Line" Color="#E3E3E3"/>
+        <SolidColorBrush x:Key="Surface" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="Paper" Color="#F6F6F6"/>
+
+        <Style x:Key="PrimaryBtn" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource Accent}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Accent}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="16,7"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="0" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Opacity" Value="0.88"/>
+                                <Setter TargetName="bd" Property="BorderBrush" Value="{StaticResource Brand}"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="bd" Property="BorderBrush" Value="{StaticResource Navy}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="bd" Property="Opacity" Value="0.4"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SecondaryBtn" TargetType="Button" BasedOn="{StaticResource PrimaryBtn}">
+            <Setter Property="Background" Value="{StaticResource Surface}"/>
+            <Setter Property="Foreground" Value="{StaticResource Ink}"/>
+            <Setter Property="BorderBrush" Value="#BDBDBD"/>
+            <Setter Property="FontWeight" Value="Normal"/>
+        </Style>
+
+        <Style x:Key="StepTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{StaticResource Ink}"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+        </Style>
+
+        <Style x:Key="StepBadge" TargetType="Border">
+            <Setter Property="Width" Value="20"/>
+            <Setter Property="Height" Value="20"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Background" Value="{StaticResource Navy}"/>
+            <Setter Property="Margin" Value="0,0,8,8"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+        </Style>
+
+        <Style TargetType="RadioButton">
+            <Setter Property="Margin" Value="0,0,0,6"/>
+            <Setter Property="Foreground" Value="{StaticResource Ink}"/>
+        </Style>
+        <Style TargetType="CheckBox">
+            <Setter Property="Margin" Value="0,0,0,6"/>
+            <Setter Property="Foreground" Value="{StaticResource Ink}"/>
+        </Style>
+
+        <Style TargetType="DataGrid">
+            <Setter Property="AutoGenerateColumns" Value="True"/>
+            <Setter Property="IsReadOnly" Value="True"/>
+            <Setter Property="CanUserAddRows" Value="False"/>
+            <Setter Property="HeadersVisibility" Value="Column"/>
+            <Setter Property="GridLinesVisibility" Value="Horizontal"/>
+            <Setter Property="HorizontalGridLinesBrush" Value="{StaticResource Line}"/>
+            <Setter Property="AlternatingRowBackground" Value="#FAFAFA"/>
+            <Setter Property="Background" Value="{StaticResource Surface}"/>
+            <Setter Property="RowBackground" Value="{StaticResource Surface}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="RowHeight" Value="26"/>
+            <Setter Property="SelectionUnit" Value="FullRow"/>
+        </Style>
+        <Style TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="{StaticResource Surface}"/>
+            <Setter Property="Foreground" Value="{StaticResource Ink}"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Padding" Value="8,7"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Ink}"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+        </Style>
+        <Style TargetType="DataGridCell">
+            <Setter Property="Padding" Value="8,0"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="DataGridCell">
+                        <Border Padding="{TemplateBinding Padding}" Background="{TemplateBinding Background}">
+                            <ContentPresenter VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header: OVERZICHT logo (lib/overzicht-octagon-blackred-rgb.png, set in script), red rule -->
+        <Border Grid.Row="0" Background="{StaticResource Surface}" Padding="22,14"
+                BorderBrush="{StaticResource Brand}" BorderThickness="0,0,0,3">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" VerticalAlignment="Center">
+                    <TextBlock Text="MODEL" Foreground="{StaticResource Muted}" FontSize="10" FontWeight="Bold" HorizontalAlignment="Right"/>
+                    <TextBlock x:Name="doc_name" Foreground="{StaticResource Ink}" FontSize="12" HorizontalAlignment="Right"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <Image x:Name="logo_img" Height="34" VerticalAlignment="Center" Stretch="Uniform"
+                           RenderOptions.BitmapScalingMode="HighQuality"/>
+                    <Border Width="1" Background="{StaticResource Line}" Margin="18,4,18,4"/>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="OVZ Param Mapper" Foreground="{StaticResource Ink}" FontSize="16" FontWeight="Bold"/>
+                        <TextBlock Text="Link model elements to VMSW articles and fill parameters"
+                                   Foreground="{StaticResource Muted}" FontSize="12"/>
+                    </StackPanel>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Files -->
+        <Border Grid.Row="1" Background="{StaticResource Surface}" BorderBrush="{StaticResource Line}"
+                BorderThickness="0,0,0,1" Padding="16,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="24"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="Article list" VerticalAlignment="Center" Foreground="{StaticResource Muted}" Margin="0,0,8,0"/>
+                <TextBox Grid.Column="1" x:Name="list_box" IsReadOnly="True" Padding="6,4" BorderBrush="{StaticResource Line}"
+                         Foreground="{StaticResource Muted}" Text="No file selected"/>
+                <Button Grid.Column="2" x:Name="list_btn" Content="Browse..." Style="{StaticResource SecondaryBtn}" Margin="6,0,0,0" Padding="10,5"/>
+
+                <TextBlock Grid.Column="4" Text="Shared mapping" VerticalAlignment="Center" Foreground="{StaticResource Muted}" Margin="0,0,8,0"/>
+                <TextBox Grid.Column="5" x:Name="map_box" IsReadOnly="True" Padding="6,4" BorderBrush="{StaticResource Line}"
+                         Foreground="{StaticResource Muted}" Text="No mapping file"/>
+                <Button Grid.Column="6" x:Name="map_open_btn" Content="Open..." Style="{StaticResource SecondaryBtn}" Margin="6,0,0,0" Padding="10,5"/>
+                <Button Grid.Column="7" x:Name="map_new_btn" Content="New..." Style="{StaticResource SecondaryBtn}" Margin="6,0,0,0" Padding="10,5"/>
+
+</Grid>
+        </Border>
+
+        <!-- Two panels -->
+        <Grid Grid.Row="2" Margin="16,12,16,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="3*" MinWidth="300"/>
+                <ColumnDefinition Width="12"/>
+                <ColumnDefinition Width="2*" MinWidth="250"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Left: model -->
+            <Border Grid.Column="0" Background="{StaticResource Surface}" BorderBrush="{StaticResource Line}"
+                    BorderThickness="1" CornerRadius="0">
+                <DockPanel>
+                    <Border DockPanel.Dock="Top" Padding="12,10" BorderBrush="{StaticResource Line}" BorderThickness="0,0,0,1">
+                        <StackPanel>
+                            <DockPanel Margin="0,0,0,8">
+                                <Grid Width="22" Height="22" Margin="0,0,10,0" VerticalAlignment="Center">
+                                    <Polygon Points="6.4,0 15.6,0 22,6.4 22,15.6 15.6,22 6.4,22 0,15.6 0,6.4" Fill="{StaticResource Brand}"/>
+                                    <TextBlock Text="1" Foreground="White" FontWeight="Bold"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Grid>
+                                <TextBlock x:Name="model_count" DockPanel.Dock="Right" Foreground="{StaticResource Muted}" VerticalAlignment="Center"/>
+                                <TextBlock Text="MODEL ELEMENTS" Style="{StaticResource StepTitle}" Margin="0" VerticalAlignment="Center"/>
+                            </DockPanel>
+                            <WrapPanel Margin="0,0,0,4">
+                                <TextBlock Text="Fill parameter" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="0,0,8,4"/>
+                                <ComboBox x:Name="target_cb" Width="320" Padding="6,3" Margin="0,0,8,4"
+                                          IsEditable="True" IsTextSearchEnabled="True" StaysOpenOnEdit="True"
+                                          ToolTip="Parameter to fill (text, number, yes/no). Type to search. '(type)' = type parameter (one value per type)."/>
+                                <TextBlock x:Name="target_info" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="0,0,0,4"/>
+                            </WrapPanel>
+                            <WrapPanel>
+                                <Grid Margin="0,0,8,4">
+                                    <ToggleButton x:Name="cat_toggle" Width="220" Padding="8,3" Background="White"
+                                                  BorderBrush="{StaticResource Line}" HorizontalContentAlignment="Stretch">
+                                        <DockPanel>
+                                            <TextBlock DockPanel.Dock="Right" Text="&#x25BE;" Foreground="{StaticResource Muted}" Margin="6,0,0,0"/>
+                                            <TextBlock x:Name="cat_label" Text="All categories" TextTrimming="CharacterEllipsis"/>
+                                        </DockPanel>
+                                    </ToggleButton>
+                                    <Popup x:Name="cat_popup" PlacementTarget="{Binding ElementName=cat_toggle}" Placement="Bottom"
+                                           StaysOpen="False" AllowsTransparency="True"
+                                           IsOpen="{Binding IsChecked, ElementName=cat_toggle, Mode=TwoWay}">
+                                        <Border Background="White" BorderBrush="{StaticResource Line}" BorderThickness="1"
+                                                CornerRadius="3" Padding="10" MinWidth="260">
+                                            <StackPanel>
+                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                                    <Button x:Name="cat_all_btn" Content="All" Style="{StaticResource SecondaryBtn}" Padding="10,3" Margin="0,0,6,0"/>
+                                                    <Button x:Name="cat_none_btn" Content="None" Style="{StaticResource SecondaryBtn}" Padding="10,3"/>
+                                                </StackPanel>
+                                                <ScrollViewer MaxHeight="360" VerticalScrollBarVisibility="Auto">
+                                                    <StackPanel x:Name="cat_list"/>
+                                                </ScrollViewer>
+                                            </StackPanel>
+                                        </Border>
+                                    </Popup>
+                                </Grid>
+                                <TextBlock Text="Search" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="0,0,6,4"/>
+                                <TextBox x:Name="model_search" Width="200" Padding="5,3" Margin="0,0,14,4" BorderBrush="{StaticResource Line}"/>
+                                <CheckBox x:Name="only_empty_cb" Content="Only empty values" Margin="0,3,14,4"/>
+                                <CheckBox x:Name="only_unassigned_cb" Content="Only without new value" Margin="0,3,14,4"/>
+                                <CheckBox x:Name="hide_noparam_cb" Content="Hide elements without this parameter" IsChecked="True" Margin="0,3,14,4"/>
+                                <CheckBox x:Name="follow_cb" Content="Follow Revit selection" IsChecked="True" Margin="0,3,0,4"
+                                          ToolTip="When you select elements in Revit, their rows are selected here"/>
+                            </WrapPanel>
+                            <WrapPanel Margin="0,4,0,0">
+                                <TextBlock Text="Group by" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="0,0,8,4"/>
+                                <ComboBox x:Name="group1_cb" Width="160" Padding="6,3" Margin="0,0,4,4"/>
+                                <TextBlock Text="then" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="2,0,6,4"/>
+                                <ComboBox x:Name="group2_cb" Width="160" Padding="6,3" Margin="0,0,4,4"/>
+                                <TextBlock Text="then" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="2,0,6,4"/>
+                                <ComboBox x:Name="group3_cb" Width="160" Padding="6,3" Margin="0,0,4,4"/>
+                                <TextBlock Text="then" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="2,0,6,4"/>
+                                <ComboBox x:Name="group4_cb" Width="160" Padding="6,3" Margin="0,0,0,4"/>
+                            </WrapPanel>
+                        </StackPanel>
+                    </Border>
+                    <Border DockPanel.Dock="Bottom" Padding="12,8" BorderBrush="{StaticResource Line}" BorderThickness="0,1,0,0">
+                        <StackPanel Orientation="Horizontal">
+                            <Button x:Name="select_btn" Content="Select in Revit" Style="{StaticResource SecondaryBtn}" Margin="0,0,8,0" Padding="10,5"/>
+                            <Button x:Name="isolate_btn" Content="Isolate in view" Style="{StaticResource SecondaryBtn}" Margin="0,0,8,0" Padding="10,5"/>
+                            <Button x:Name="clear_btn" Content="Remove article" Style="{StaticResource SecondaryBtn}" Padding="10,5" Margin="0,0,8,0"/>
+                            <Button x:Name="refresh_btn" Content="Refresh model" Margin="0,0,12,0" Style="{StaticResource SecondaryBtn}" Padding="10,5"
+                                    ToolTip="Read the model again after you changed things in Revit"/>
+                            <TextBlock Foreground="{StaticResource Muted}" VerticalAlignment="Center" TextWrapping="Wrap"
+                                       Text="Right-click a header: select its rows.  Drop on a header: whole group."/>
+                        </StackPanel>
+                    </Border>
+                    <DataGrid x:Name="model_grid" SelectionMode="Extended" AllowDrop="True"
+                              VirtualizingPanel.IsVirtualizingWhenGrouping="True"
+                              VirtualizingPanel.VirtualizationMode="Recycling">
+                        <DataGrid.GroupStyle>
+                            <GroupStyle>
+                                <GroupStyle.ContainerStyle>
+                                    <Style TargetType="GroupItem">
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="GroupItem">
+                                                    <Expander IsExpanded="True" BorderBrush="{StaticResource Brand}" BorderThickness="3,0,0,0"
+                                                              Padding="0" Background="#F2F2F2" Margin="0,0,0,1">
+                                                        <Expander.Header>
+                                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold"
+                                                                       Foreground="{StaticResource Ink}" Padding="2,3"/>
+                                                        </Expander.Header>
+                                                        <Border Background="White" Padding="6,0,0,0">
+                                                            <ItemsPresenter/>
+                                                        </Border>
+                                                    </Expander>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </GroupStyle.ContainerStyle>
+                            </GroupStyle>
+                        </DataGrid.GroupStyle>
+                        <DataGrid.RowStyle>
+                            <Style TargetType="DataGridRow">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding [state]}" Value="manual">
+                                        <Setter Property="Background" Value="#EAF5EE"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding [state]}" Value="saved">
+                                        <Setter Property="Background" Value="#EEF0F4"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding [state]}" Value="done">
+                                        <Setter Property="Foreground" Value="#6E6E6E"/>
+                                    </DataTrigger>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter Property="Background" Value="{StaticResource BrandTint}"/>
+                                        <Setter Property="Foreground" Value="{StaticResource Ink}"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </DataGrid.RowStyle>
+                    </DataGrid>
+                </DockPanel>
+            </Border>
+
+            <!-- Right: articles -->
+            <!-- drag this bar to make the panels wider or narrower -->
+            <GridSplitter Grid.Column="1" Width="12" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                          ResizeBehavior="PreviousAndNext" ResizeDirection="Columns" Cursor="SizeWE"
+                          Background="Transparent" ToolTip="Drag to resize the panels"/>
+            <Border Grid.Column="1" Width="4" Height="40" CornerRadius="2" Background="{StaticResource Line}"
+                    HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False"/>
+            <Border Grid.Column="2" Background="{StaticResource Surface}" BorderBrush="{StaticResource Line}"
+                    BorderThickness="1" CornerRadius="0">
+                <DockPanel>
+                    <Border DockPanel.Dock="Top" Padding="12,10" BorderBrush="{StaticResource Line}" BorderThickness="0,0,0,1">
+                        <StackPanel>
+                            <DockPanel Margin="0,0,0,8">
+                                <Grid Width="22" Height="22" Margin="0,0,10,0" VerticalAlignment="Center">
+                                    <Polygon Points="6.4,0 15.6,0 22,6.4 22,15.6 15.6,22 6.4,22 0,15.6 0,6.4" Fill="{StaticResource Brand}"/>
+                                    <TextBlock Text="2" Foreground="White" FontWeight="Bold"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Grid>
+                                <TextBlock x:Name="art_count" DockPanel.Dock="Right" Foreground="{StaticResource Muted}" VerticalAlignment="Center"/>
+                                <TextBlock Text="VMSW ARTICLES" Style="{StaticResource StepTitle}" Margin="0" VerticalAlignment="Center"/>
+                            </DockPanel>
+                            <WrapPanel>
+                                <TextBlock Text="Search" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="0,0,6,4"/>
+                                <TextBox x:Name="art_search" Width="220" Padding="5,3" Margin="0,0,10,4" BorderBrush="{StaticResource Line}"/>
+                                <ComboBox x:Name="sub_cb" Width="130" Padding="6,3" Margin="0,0,0,4"/>
+                            </WrapPanel>
+                            <WrapPanel Margin="0,4,0,0">
+                                <TextBlock Text="Drag value from column" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="0,0,8,4"/>
+                                <ComboBox x:Name="value_cb" Width="240" Padding="6,3" Margin="0,0,0,4"/>
+                            </WrapPanel>
+                        </StackPanel>
+                    </Border>
+                    <Border DockPanel.Dock="Bottom" Padding="12,8" BorderBrush="{StaticResource Line}" BorderThickness="0,1,0,0">
+                        <DockPanel>
+                            <Button x:Name="assign_btn" DockPanel.Dock="Left" Content="&#x2190; Give to selected rows"
+                                    Style="{StaticResource SecondaryBtn}" Padding="10,5" Margin="0,0,10,0"/>
+                            <TextBlock Foreground="{StaticResource Muted}" VerticalAlignment="Center" TextWrapping="Wrap"
+                                       Text="Drag an article onto the rows on the left, or double-click it. The value comes from the &#x25B6; column."/>
+                        </DockPanel>
+                    </Border>
+                    <DataGrid x:Name="art_grid" SelectionMode="Single" FrozenColumnCount="1"/>
+                </DockPanel>
+            </Border>
+        </Grid>
+
+        <!-- Footer -->
+        <Border Grid.Row="3" Background="{StaticResource Surface}" BorderBrush="{StaticResource Line}"
+                BorderThickness="0,1,0,0" Padding="16,10">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <CheckBox x:Name="green_cb" Content="green = correct" VerticalAlignment="Center" Margin="0,0,8,0"
+                              ToolTip="Also colour elements whose value matches the mapping"/>
+                    <Button x:Name="colour_btn" Content="Show check colours" Style="{StaticResource SecondaryBtn}" Margin="0,0,8,0"
+                            ToolTip="Colour the rows shown in the list in the 'OVZ check' 3D view: red = empty, orange = different from the mapping"/>
+                    <Button x:Name="uncolour_btn" Content="Clear colours" Style="{StaticResource SecondaryBtn}" Margin="0,0,16,0"/>
+                    <Button x:Name="unfilled_btn" Content="Find unfilled" Style="{StaticResource SecondaryBtn}" Margin="0,0,8,0"/>
+                    <Button x:Name="save_btn" Content="Save mapping" Style="{StaticResource SecondaryBtn}" Margin="0,0,8,0"/>
+                    <Button x:Name="saveas_btn" Content="Save as..." Style="{StaticResource SecondaryBtn}" Margin="0,0,8,0"/>
+                    <Button x:Name="close_btn" Content="Close" Style="{StaticResource SecondaryBtn}" Margin="0,0,8,0"/>
+                    <Button x:Name="apply_btn" Content="Apply to model" Style="{StaticResource PrimaryBtn}"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Width="12" Height="12" Background="#EAF5EE" BorderBrush="{StaticResource Line}" BorderThickness="1" Margin="0,0,4,0"/>
+                    <TextBlock Text="new" Foreground="{StaticResource Muted}" Margin="0,0,12,0"/>
+                    <Border Width="12" Height="12" Background="#EEF0F4" BorderBrush="{StaticResource Line}" BorderThickness="1" Margin="0,0,4,0"/>
+                    <TextBlock Text="from saved mapping" Foreground="{StaticResource Muted}" Margin="0,0,20,0"/>
+                    <TextBlock x:Name="status_text" Foreground="{StaticResource Muted}" TextTrimming="CharacterEllipsis"
+                               Text="Loading..."/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+    </Grid>
+</Window>

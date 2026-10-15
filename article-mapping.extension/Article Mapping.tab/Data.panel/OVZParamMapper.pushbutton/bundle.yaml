@@ -1,0 +1,5 @@
+title: OVZ Param Mapper
+tooltip: >-
+  Link model elements (grouped like a schedule) to the VMSW article list by drag
+  and drop, fill any parameter, check empty or different values with colours.
+  Links are saved in a shared mapping file and reused in the next project.
