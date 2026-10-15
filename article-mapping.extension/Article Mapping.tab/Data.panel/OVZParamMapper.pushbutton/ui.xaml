@@ -212,9 +212,29 @@
                             </DockPanel>
                             <WrapPanel Margin="0,0,0,4">
                                 <TextBlock Text="Fill parameter" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="0,0,8,4"/>
-                                <ComboBox x:Name="target_cb" Width="320" Padding="6,3" Margin="0,0,8,4"
-                                          IsEditable="True" IsTextSearchEnabled="True" StaysOpenOnEdit="True"
-                                          ToolTip="Parameter to fill (text, number, yes/no). Type to search. '(type)' = type parameter (one value per type)."/>
+                                <!-- autocomplete: type part of a name, or click the arrow for the whole list -->
+                                <Grid Margin="0,0,8,4">
+                                    <TextBox x:Name="target_box" Width="320" Padding="6,3,22,3" BorderBrush="{StaticResource Line}"
+                                             ToolTip="Parameter to fill (text, number, yes/no). Type to search. '(type)' = type parameter (one value per type)."/>
+                                    <TextBlock x:Name="target_arrow" Text="&#x25BE;" Foreground="{StaticResource Muted}"
+                                               HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,4,0"
+                                               Padding="4,0" Background="Transparent" Cursor="Hand"/>
+                                    <Popup x:Name="target_popup" PlacementTarget="{Binding ElementName=target_box}" Placement="Bottom"
+                                           StaysOpen="False" AllowsTransparency="True">
+                                        <Border Background="White" BorderBrush="{StaticResource Line}" BorderThickness="1">
+                                            <!-- not focusable: the typing focus stays in target_box -->
+                                            <ListBox x:Name="target_list" MaxHeight="400" BorderThickness="0" Focusable="False"
+                                                     Width="{Binding ActualWidth, ElementName=target_box}">
+                                                <ListBox.ItemContainerStyle>
+                                                    <Style TargetType="ListBoxItem">
+                                                        <Setter Property="Focusable" Value="False"/>
+                                                        <Setter Property="Padding" Value="6,3"/>
+                                                    </Style>
+                                                </ListBox.ItemContainerStyle>
+                                            </ListBox>
+                                        </Border>
+                                    </Popup>
+                                </Grid>
                                 <TextBlock x:Name="target_info" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="0,0,0,4"/>
                             </WrapPanel>
                             <WrapPanel>

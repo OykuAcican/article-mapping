@@ -26,12 +26,12 @@ from System.Data import DataTable
 from System.Collections.Generic import List
 from System.Windows import DragDrop, DragDropEffects, DataFormats, SystemParameters
 from System.Windows.Controls import (DataGridRow, TextBlock, CheckBox, StackPanel, Expander,
-                                     GroupItem, DataGridCell, Control)
+                                     GroupItem, DataGridCell, Control, ListBoxItem)
 from System.Windows import Style, Setter, Visibility
 from System.Windows.Media import SolidColorBrush, Color
 from System.Windows.Data import PropertyGroupDescription, CollectionViewGroup
 import System.Windows.Media
-from System.Windows.Input import MouseButtonState
+from System.Windows.Input import MouseButtonState, Key
 from System.Windows.Media import VisualTreeHelper
 from System.Windows import LogicalTreeHelper
 
@@ -313,11 +313,13 @@ WRITABLE_STORAGE = (DB.StorageType.String, DB.StorageType.Integer, DB.StorageTyp
 
 def _text_params(element, suffix, names):
     """Every editable parameter: text, number, integer and Yes/No.
-    (Element references such as Material can't be filled from a text value.)"""
+    (Element references such as Material can't be filled from a text value.)
+    names: name -> True when it is a shared parameter."""
     try:
         for p in element.Parameters:
             if p.StorageType in WRITABLE_STORAGE and not p.IsReadOnly:
-                names.add(p.Definition.Name + suffix)
+                name = p.Definition.Name + suffix
+                names[name] = names.get(name, False) or bool(p.IsShared)
     except Exception:
         pass
 
@@ -403,11 +405,11 @@ def write_value(p, raw):
 
 def gather_groups(extra_names, target=P_INST, split_names=()):
     """Group the model elements. Also returns every editable text parameter
-    found (instance names, and type names with ' (type)'), and every parameter
+    found (instance names, and type names with ' (type)') -> is shared, and every parameter
     name of any kind (for Group by). Rows are also split by the values of
     split_names; the mapping key (g.key) does not include them."""
     pname, on_type = split_target(target)
-    param_names = set()
+    param_names = {}               # name -> is shared
     all_names = set()
     seen_types = set()
     groups, by_key = [], {}
@@ -595,6 +597,8 @@ class OvzWindow(forms.WPFWindow):
         self.art_columns = []
         self.art_values = {}
         self._loading_target = False
+        self._setting_target = False   # target_box text set by code, not typed
+        self._target_names = []        # Fill parameter choices, shared first
         self._el_to_group = {}
         self._own_selection = set()
         self._sel_callback = None
@@ -642,7 +646,13 @@ class OvzWindow(forms.WPFWindow):
                             (self.only_unassigned_cb.Click, self.on_model_filter),
                             (self.hide_noparam_cb.Click, self.on_hide_noparam),
                             (self.art_search.TextChanged, self.on_art_filter),
-                            (self.target_cb.SelectionChanged, self.on_target_changed),
+                            (self.target_box.PreviewMouseLeftButtonDown, self.on_target_mouse_down),
+                            (self.target_box.GotFocus, self.on_target_got_focus),
+                            (self.target_box.TextChanged, self.on_target_text_changed),
+                            (self.target_box.PreviewKeyDown, self.on_target_key),
+                            (self.target_box.LostFocus, self.on_target_lost_focus),
+                            (self.target_arrow.MouseLeftButtonDown, self.on_target_arrow),
+                            (self.target_list.PreviewMouseLeftButtonUp, self.on_target_list_click),
                             (self.value_cb.SelectionChanged, self.on_value_col_changed),
                             (self.sub_cb.SelectionChanged, self.on_art_filter),
                             (self.model_grid.AutoGeneratingColumn, self.on_auto_column),
@@ -849,30 +859,145 @@ class OvzWindow(forms.WPFWindow):
 
     # -- target parameter --------------------------------------------------------------
     def _fill_target_list(self, names):
-        names = set(names)
-        names.add(P_INST)
-        names.add(self.target)
-        ordered = sorted(names, key=lambda n: (n != P_INST, n.lower()))
-        self._loading_target = True
-        self.target_cb.ItemsSource = ordered
-        self.target_cb.SelectedItem = self.target
-        self._loading_target = False
-        self.target_info.Text = '{} parameters'.format(len(ordered))
+        """names: parameter name -> True for a shared parameter."""
+        shared = dict(names)
+        shared.setdefault(P_INST, False)
+        shared.setdefault(self.target, False)
+        # shared parameters first, then the others, each A-Z
+        self._target_names = sorted(shared, key=lambda n: (not shared[n], n.lower()))
+        self._set_target_text(self.target)
+        self.target_info.Text = '{} parameters'.format(len(self._target_names))
 
-    def on_target_changed(self, sender, e):
-        if self._loading_target or self.target_cb.SelectedItem is None:
+    def _set_target_text(self, text):
+        """Set the box text from code (not treated as typing)."""
+        self._setting_target = True
+        self.target_box.Text = text
+        self._setting_target = False
+
+    def _target_matches(self, text):
+        """Names containing text: exact match, then starts with, then contains."""
+        t = (text or '').strip().lower()
+        if not t:
+            return list(self._target_names)
+        exact, start, inside = [], [], []
+        for n in self._target_names:           # already shared first, then A-Z
+            low = n.lower()
+            if low == t:
+                exact.append(n)
+            elif low.startswith(t):
+                start.append(n)
+            elif t in low:
+                inside.append(n)
+        return exact + start + inside
+
+    def _show_target_list(self, names, select=None):
+        lst = self.target_list
+        if names:
+            lst.ItemsSource = names
+            lst.SelectedIndex = names.index(select) if select in names else 0
+        else:
+            item = ListBoxItem()
+            item.Content = 'No matching parameter'
+            item.IsEnabled = False
+            lst.ItemsSource = [item]
+            lst.SelectedIndex = -1
+        self.target_popup.IsOpen = True
+        if lst.SelectedItem is not None:
+            lst.ScrollIntoView(lst.SelectedItem)
+
+    def _show_full_target_list(self):
+        self._show_target_list(list(self._target_names), self.target)
+
+    def _move_target_highlight(self, step):
+        if not self.target_popup.IsOpen:
+            text = self.target_box.Text
+            if text == self.target:
+                self._show_full_target_list()
+            else:
+                self._show_target_list(self._target_matches(text))
             return
-        new = self.target_cb.SelectedItem
-        if new == self.target:
+        lst = self.target_list
+        if not lst.Items.Count or not isinstance(lst.Items[0], str):
+            return                              # "No matching parameter"
+        i = max(0, min(lst.Items.Count - 1, lst.SelectedIndex + step))
+        lst.SelectedIndex = i
+        lst.ScrollIntoView(lst.Items[i])
+
+    def _choose_highlighted_target(self):
+        item = self.target_list.SelectedItem
+        if self.target_popup.IsOpen and isinstance(item, str):
+            self._choose_target(item)
+            return True
+        return False
+
+    def _choose_target(self, name):
+        self.target_popup.IsOpen = False
+        self._set_target_text(name)
+        self.target_box.SelectAll()
+        if name == self.target:
             return
-        self.target = new
-        config.ovz_target = new
+        self.target = name
+        config.ovz_target = name
         script.save_config()
 
         def run():
             self.load_model()
             self._set_status('Now filling "{}"'.format(self.target))
         self._run(run)
+
+    def on_target_mouse_down(self, sender, e):
+        # first click: take the focus here, so GotFocus can select all text
+        # (otherwise the click itself would put the caret and undo the selection)
+        if not self.target_box.IsKeyboardFocusWithin:
+            self.target_box.Focus()
+            e.Handled = True
+
+    def on_target_got_focus(self, sender, e):
+        self.target_box.SelectAll()
+        self._show_full_target_list()
+
+    def on_target_text_changed(self, sender, e):
+        if self._setting_target or not self.target_box.IsKeyboardFocusWithin:
+            return
+        self._show_target_list(self._target_matches(self.target_box.Text))
+
+    def on_target_key(self, sender, e):
+        if e.Key == Key.Down:
+            self._move_target_highlight(1)
+            e.Handled = True
+        elif e.Key == Key.Up:
+            self._move_target_highlight(-1)
+            e.Handled = True
+        elif e.Key == Key.Enter:
+            self._choose_highlighted_target()
+            e.Handled = True
+        elif e.Key == Key.Tab:
+            self._choose_highlighted_target()     # Tab still moves on to the next field
+        elif e.Key == Key.Escape:
+            self.target_popup.IsOpen = False
+            self._set_target_text(self.target)
+            self.target_box.SelectAll()
+            e.Handled = True
+
+    def on_target_list_click(self, sender, e):
+        item = find_ancestor(e.OriginalSource, ListBoxItem)
+        if item is not None and item.IsEnabled and isinstance(item.Content, str):
+            self._choose_target(item.Content)
+            e.Handled = True
+
+    def on_target_arrow(self, sender, e):
+        if not self.target_box.IsKeyboardFocusWithin:
+            self.target_box.Focus()               # GotFocus opens the full list
+        elif self.target_popup.IsOpen:
+            self.target_popup.IsOpen = False
+        else:
+            self._show_full_target_list()
+        e.Handled = True
+
+    def on_target_lost_focus(self, sender, e):
+        # never leave half-typed text behind
+        self.target_popup.IsOpen = False
+        self._set_target_text(self.target)
 
     def _mkey(self, g, system=None):
         return make_key(g.category, g.family, g.type,
