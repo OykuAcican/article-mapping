@@ -134,6 +134,9 @@ OLD_FIELD_NAMES = {'System classification': 'System Classification',
                    'System type': 'System Type',
                    'System abbreviation': 'System Classification',
                    'System Abbreviation': 'System Classification'}
+# between the fixed fields and the model's parameters in the Group by lists
+# (disabled in ui.xaml, GroupChoiceItem)
+SEPARATOR = unichr(0x2500) * 10
 SHAPE_ORDER = {'Round': 0, 'Rectangular': 1, 'Oval': 2}
 ART_COLS = ['Art_nr', 'Omschrijving', 'Unit', 'Discipline']
 GROUP_KEY_COLS = ('k0', 'k1', 'k2', 'k3')
@@ -270,6 +273,7 @@ class Group(object):
         self.empty = 0
         self.has_param = False
         self.extra = {}            # extra column -> set of values
+        self.extra_values = {}     # Group by parameter -> value (rows are split by these)
         self.classification = ''
         self.shape = ''
         self.diameter = self.width = self.height = 0
@@ -316,6 +320,23 @@ def _text_params(element, suffix, names):
                 names.add(p.Definition.Name + suffix)
     except Exception:
         pass
+
+
+def _all_params(element, suffix, names):
+    """Every parameter name, any kind and read-only too (for Group by)."""
+    try:
+        for p in element.Parameters:
+            names.add(p.Definition.Name + suffix)
+    except Exception:
+        pass
+
+
+def split_value(el, el_type, name):
+    """Value of a Group by parameter ('<name> (type)' = from the element type)."""
+    pname, on_type = split_target(name)
+    target = el_type if on_type else el
+    p = target.LookupParameter(pname) if target is not None else None
+    return read_value(p) if p is not None else ''
 
 
 def read_value(p):
@@ -380,11 +401,15 @@ def write_value(p, raw):
     raise ValueError('this kind of parameter cannot be filled from text')
 
 
-def gather_groups(extra_names, target=P_INST):
+def gather_groups(extra_names, target=P_INST, split_names=()):
     """Group the model elements. Also returns every editable text parameter
-    found (instance names, and type names with ' (type)')."""
+    found (instance names, and type names with ' (type)'), and every parameter
+    name of any kind (for Group by). Rows are also split by the values of
+    split_names; the mapping key (g.key) does not include them."""
     pname, on_type = split_target(target)
     param_names = set()
+    all_names = set()
+    seen_types = set()
     groups, by_key = [], {}
     els = DB.FilteredElementCollector(doc).WhereElementIsNotElementType().ToElements()
     for el in els:
@@ -413,17 +438,24 @@ def gather_groups(extra_names, target=P_INST):
         abbr = system_abbreviation(el)
         size = size_text(el)
         key = make_key(cat.Name, fam, typ, abbr or systype, size)
-        g = by_key.get(key)
+        split_vals = tuple(split_value(el, el_type, n) for n in split_names)
+        row_key = (key,) + split_vals
+        g = by_key.get(row_key)
         if g is None:
             g = Group(len(groups), key, cat.Name, fam, typ, systype, abbr, size)
+            g.extra_values = dict(zip(split_names, split_vals))
             g.classification = param_text(el, BIP.RBS_SYSTEM_CLASSIFICATION_PARAM)
             g.shape, g.diameter, g.width, g.height = shape_and_dims(el, size)
             g.type_id = el_type.Id if el_type is not None else None
             _text_params(el, '', param_names)
+            _all_params(el, '', all_names)
             if el_type is not None:
                 _text_params(el_type, TYPE_SUFFIX, param_names)
+                if str(tid) not in seen_types:
+                    seen_types.add(str(tid))
+                    _all_params(el_type, TYPE_SUFFIX, all_names)
             groups.append(g)
-            by_key[key] = g
+            by_key[row_key] = g
         g.ids.append(el.Id)
         if p is not None:
             g.has_param = True
@@ -433,7 +465,7 @@ def gather_groups(extra_names, target=P_INST):
                 g.empty += 1
         for name in extra_names:
             g.extra.setdefault(name, set()).add(lookup_text(el, el_type, name))
-    return groups, param_names
+    return groups, param_names, all_names
 
 
 def _num_key(text):
@@ -469,7 +501,13 @@ def group_value(g, field):
             return ('(no {})'.format(field.lower()), '99999999')
         return ((u'\u00d8{}' if field == 'Diameter' else '{}').format(n), '%08d' % n)
     else:
-        v = ''
+        # any other parameter chosen in Group by: numbers first (by value), then text
+        v = g.extra_values.get(field, '')
+        if not v:
+            return ('(empty)', '2')
+        if v[0].isdigit():
+            return (v, '0 ' + _num_key(v))
+        return (v, '1 ' + v.lower())
     return (v or '(empty)', (v or '~').lower())
 
 
@@ -535,6 +573,12 @@ class OvzWindow(forms.WPFWindow):
         self.mapping = {}          # what is in the shared file (as last read)
         self.snapshot = {}         # the file as it was when we read it
         self.changes = {}          # key -> record or None (removed)
+        # what was given to each element in this session: (target, element id) ->
+        # (value, article, order); '' = removed. Rows keep their own value even
+        # when several rows share one mapping key, also after the model is re-read.
+        self._assigned = {}
+        self._seq = 0
+        self._split = []           # Group by parameters the rows were split by
         self.map_path = ''
         self.extra_names = []
         self._drag_start = None
@@ -561,9 +605,11 @@ class OvzWindow(forms.WPFWindow):
         if len(saved) != 3 or saved[0] == 'Category':
             saved = DEFAULT_GROUPING
         saved = [OLD_FIELD_NAMES.get(v, v) for v in saved]
+        # until the model is read, offer the saved parameters so they can be selected
+        choices = self._group_choices(v for v in saved if v)
         for cb, value in zip(self._group_cbs, saved):
-            cb.ItemsSource = [NONE_FIELD] + GROUP_FIELDS
-            cb.SelectedItem = value if value in GROUP_FIELDS else NONE_FIELD
+            cb.ItemsSource = choices
+            cb.SelectedItem = value if value in choices else NONE_FIELD
             cb.SelectionChanged += self.on_grouping_changed
         self._loading_grouping = False
         self._cat_boxes = []       # category CheckBoxes in the popup
@@ -682,6 +728,7 @@ class OvzWindow(forms.WPFWindow):
             return
         self.snapshot = dict(self.mapping)
         self.changes = {}
+        self._assigned = {}
         self.map_path = path
         self.map_box.Text = '{}  ({} rules)'.format(path, len(self.mapping))
         config.ovz_mapping = path
@@ -689,9 +736,12 @@ class OvzWindow(forms.WPFWindow):
         self._apply_mapping_to_groups(reset=True)
 
     def load_model(self):
-        self.groups, names = gather_groups(self.extra_names, self.target)
+        split = self._split_names()
+        self.groups, names, all_names = gather_groups(self.extra_names, self.target, split)
         self._el_to_group = dict((str(eid), g.idx) for g in self.groups for eid in g.ids)
         self._fill_target_list(names)
+        self._fill_group_lists(all_names)
+        self._split = self._split_names()
         self._apply_mapping_to_groups(reset=True, refresh=False)
         self._build_model_table()
         self._build_cat_list()
@@ -700,13 +750,23 @@ class OvzWindow(forms.WPFWindow):
     def _apply_mapping_to_groups(self, reset=False, refresh=True):
         for g in self.groups:
             key = self._mkey(g)
-            if key in self.changes:
-                rec = self.changes[key]
-                if rec:
-                    g.article, g.source, g.state = rec['Value'], rec['Art_nr'], 'manual'
+            given = self._row_assignment(g)
+            if given is not None:
+                # given (or removed) in this session: the row keeps its own value,
+                # even if another row with the same mapping key got a different one
+                g.article, g.source = given[0], given[1]
+                if not g.article:
+                    g.state = ''
+                elif key in self.changes:
+                    g.state = 'manual'
                 else:
-                    g.article, g.source, g.state = '', '', ''
+                    g.state = 'done' if g.current == g.article else 'saved'
                 continue
+            if key in self.changes and self.changes[key] is None:
+                g.article, g.source, g.state = '', '', ''
+                continue
+            # (a rule changed through another row with this key is not copied
+            # here: this row keeps what the mapping file has)
             rec = self.mapping.get(key)
             if not rec and g.abbr and g.systype:
                 # rule saved with the system type name (before the abbreviation
@@ -715,7 +775,8 @@ class OvzWindow(forms.WPFWindow):
                 if old:
                     rec = dict(old)
                     rec['System'] = g.abbr
-                    self.changes[key] = rec
+                    if key not in self.changes:
+                        self.changes[key] = rec
                     g.article, g.source, g.state = rec['Value'], rec['Art_nr'], 'saved'
                     continue
             if rec:
@@ -829,9 +890,29 @@ class OvzWindow(forms.WPFWindow):
         out = ['Category']
         for cb in self._group_cbs:
             f = cb.SelectedItem
-            if f and f != NONE_FIELD and f not in out:
+            if f and f not in (NONE_FIELD, SEPARATOR) and f not in out:
                 out.append(f)
         return out
+
+    def _split_names(self):
+        """The chosen Group by parameters that are not fixed fields."""
+        return [f for f in self._grouping()[1:] if f not in GROUP_FIELDS]
+
+    def _group_choices(self, param_names):
+        """Fixed fields, a separator, then the model's parameters A-Z."""
+        skip = set(GROUP_FIELDS + ['Category', NONE_FIELD, SEPARATOR])
+        params = sorted(set(n for n in param_names if n not in skip), key=lambda n: n.lower())
+        return [NONE_FIELD] + GROUP_FIELDS + [SEPARATOR] + params
+
+    def _fill_group_lists(self, param_names):
+        """Offer every parameter found on the elements; keep the choice if it still exists."""
+        choices = self._group_choices(param_names)
+        self._loading_grouping = True
+        for cb in self._group_cbs:
+            current = cb.SelectedItem
+            cb.ItemsSource = choices
+            cb.SelectedItem = current if current in choices else NONE_FIELD
+        self._loading_grouping = False
 
     def _fill_group_columns(self):
         fields = self._grouping()
@@ -879,6 +960,13 @@ class OvzWindow(forms.WPFWindow):
             return
         config.ovz_grouping = ';'.join(cb.SelectedItem or NONE_FIELD for cb in self._group_cbs)
         script.save_config()
+        if sorted(self._split_names()) != sorted(self._split):
+            # rows are split by these parameters' values: read the model again
+            def run():
+                self.load_model()
+                self._set_status('Model read again for the new grouping')
+            self._run(run)
+            return
         self._fill_group_columns()
         self._apply_grouping()
         self._model_filter()
@@ -1134,9 +1222,50 @@ class OvzWindow(forms.WPFWindow):
             return
         for g in groups:
             g.article, g.source, g.state = value, code, 'manual'
+            self._remember(g, value, code)
+            # one rule per mapping key: the last value given is the one saved
             self.changes[self._mkey(g)] = self._record(g, value, code)
             self._update_row(g)
         self._set_status(u'{} row(s): {} = {}'.format(len(groups), self.target, value))
+
+    # -- per-row values when rows share a mapping key ----------------------------------
+    def _remember(self, g, value, code):
+        """Store what this row got in this session ('' = removed)."""
+        self._seq += 1
+        for eid in g.ids:
+            self._assigned[(self.target, str(eid))] = (value, code, self._seq)
+
+    def _row_assignment(self, g):
+        """Latest (value, article, order) given to this row's elements, or None."""
+        best = None
+        for eid in g.ids:
+            a = self._assigned.get((self.target, str(eid)))
+            if a is not None and (best is None or a[2] > best[2]):
+                best = a
+        return best
+
+    def _latest_for_key(self, key):
+        """(row, assignment) of the last value still given to a row with this key."""
+        best = None
+        for g in self.groups:
+            if self._mkey(g) != key:
+                continue
+            a = self._row_assignment(g)
+            if a is not None and a[0] and (best is None or a[2] > best[1][2]):
+                best = (g, a)
+        return best
+
+    def _shared_key_values(self):
+        """Mapping keys whose rows got different values in this session."""
+        per_key = {}
+        for g in self.groups:
+            key = self._mkey(g)
+            if not self.changes.get(key):
+                continue
+            a = self._row_assignment(g)
+            if a is not None and a[0]:
+                per_key.setdefault(key, set()).add(a[0])
+        return [(key, sorted(vals)) for key, vals in sorted(per_key.items()) if len(vals) > 1]
 
     # -- events: columns, filters ------------------------------------------------------
     def on_auto_column(self, sender, e):
@@ -1312,11 +1441,16 @@ class OvzWindow(forms.WPFWindow):
     def on_clear(self, sender, e):
         groups = [g for g in self._selected_groups() if g.article]
         for g in groups:
-            key = self._mkey(g)
-            if key in self.mapping or key in self.changes:
-                self.changes[key] = None
+            self._remember(g, '', '')
             g.article, g.source, g.state = '', '', ''
             self._update_row(g)
+        for key in set(self._mkey(g) for g in groups):
+            # another row with the same key still has a value: keep that as the rule
+            left = self._latest_for_key(key)
+            if left is not None:
+                self.changes[key] = self._record(left[0], left[1][0], left[1][1])
+            elif key in self.mapping or key in self.changes:
+                self.changes[key] = None
         if groups:
             self._set_status('Value removed from {} row(s); the model keeps its value '
                              'until you change it'.format(len(groups)))
@@ -1492,6 +1626,16 @@ class OvzWindow(forms.WPFWindow):
             if not path:
                 return False
             self.map_path = path
+        shared = self._shared_key_values()
+        if shared:
+            lines = [u'{}: {}   (saved: {})'.format(key.replace('|', ' / '), ', '.join(vals),
+                                                  self.changes[key]['Value'])
+                     for key, vals in shared[:12]]
+            more = '\n...and {} more'.format(len(shared) - 12) if len(shared) > 12 else ''
+            forms.alert(u'These rows share one rule in the shared mapping, so only one value '
+                        u'can be remembered for the next project:\n\n{}{}\n\nThe last value is '
+                        u'saved. In this model, every row is written with its own value.'
+                        .format('\n'.join(lines), more))
         try:
             disk = load_mapping(self.map_path)
         except Exception as ex:

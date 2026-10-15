@@ -83,6 +83,16 @@
             <Setter Property="Foreground" Value="{StaticResource Ink}"/>
         </Style>
 
+        <!-- Group by lists: the separator line between the fixed fields and the
+             model's parameters cannot be chosen (text = SEPARATOR in script.py) -->
+        <Style x:Key="GroupChoiceItem" TargetType="ComboBoxItem">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding}" Value="&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;">
+                    <Setter Property="IsEnabled" Value="False"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
         <Style TargetType="DataGrid">
             <Setter Property="AutoGenerateColumns" Value="True"/>
             <Setter Property="IsReadOnly" Value="True"/>
@@ -243,11 +253,11 @@
                             </WrapPanel>
                             <WrapPanel Margin="0,4,0,0">
                                 <TextBlock Text="Category, then" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="0,0,8,4"/>
-                                <ComboBox x:Name="group1_cb" Width="140" Padding="6,3" Margin="0,0,4,4"/>
+                                <ComboBox x:Name="group1_cb" ItemContainerStyle="{StaticResource GroupChoiceItem}" Width="140" Padding="6,3" Margin="0,0,4,4"/>
                                 <TextBlock Text="then" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="2,0,6,4"/>
-                                <ComboBox x:Name="group2_cb" Width="140" Padding="6,3" Margin="0,0,4,4"/>
+                                <ComboBox x:Name="group2_cb" ItemContainerStyle="{StaticResource GroupChoiceItem}" Width="140" Padding="6,3" Margin="0,0,4,4"/>
                                 <TextBlock Text="then" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="2,0,6,4"/>
-                                <ComboBox x:Name="group3_cb" Width="140" Padding="6,3" Margin="0,0,14,4"/>
+                                <ComboBox x:Name="group3_cb" ItemContainerStyle="{StaticResource GroupChoiceItem}" Width="140" Padding="6,3" Margin="0,0,14,4"/>
                                 <Button x:Name="collapse_all_btn" Content="Collapse categories" Style="{StaticResource SecondaryBtn}"
                                         Padding="8,2" Margin="0,0,6,4"/>
                                 <Button x:Name="expand_all_btn" Content="Expand categories" Style="{StaticResource SecondaryBtn}"
