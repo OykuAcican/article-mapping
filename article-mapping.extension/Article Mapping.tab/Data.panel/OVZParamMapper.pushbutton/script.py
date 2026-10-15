@@ -26,7 +26,8 @@ from System.Data import DataTable
 from System.Collections.Generic import List
 from System.Windows import DragDrop, DragDropEffects, DataFormats, SystemParameters
 from System.Windows.Controls import (DataGridRow, TextBlock, CheckBox, StackPanel, Expander,
-                                     GroupItem, DataGridCell, Control, ListBoxItem)
+                                     GroupItem, DataGridCell, Control, ListBoxItem, TextBox,
+                                     Button)
 from System.Windows import Style, Setter, Visibility
 from System.Windows.Media import SolidColorBrush, Color
 from System.Windows.Data import PropertyGroupDescription, CollectionViewGroup
@@ -577,6 +578,10 @@ class AutoCompletePicker(object):
         self.names = []            # priority items first, otherwise in the given order
         self.current = ''
         self._setting = False      # box text set by code, not typed
+        # all pickers of this window, so opening one closes the others
+        if not hasattr(window, '_pickers'):
+            window._pickers = []
+        window._pickers.append(self)
         for ev, handler in ((box.PreviewMouseLeftButtonDown, self._on_mouse_down),
                             (box.PreviewMouseLeftButtonUp, self._on_click),
                             (box.GotKeyboardFocus, self._on_got_focus),
@@ -585,7 +590,9 @@ class AutoCompletePicker(object):
                             (box.LostKeyboardFocus, self._on_lost_focus),
                             (arrow.Click, self._on_arrow),
                             (listbox.PreviewMouseLeftButtonUp, self._on_list_click),
+                            (window.PreviewMouseDown, self._on_window_mouse_down),
                             (window.LocationChanged, self._on_window_moved),
+                            # (a click outside the tool window, e.g. in the Revit model)
                             (window.Deactivated, self._on_window_moved)):
             ev += handler
 
@@ -637,6 +644,9 @@ class AutoCompletePicker(object):
             item.IsEnabled = False
             lst.ItemsSource = [item]
             lst.SelectedIndex = -1
+        for other in self.window._pickers:
+            if other is not self and other.popup.IsOpen:
+                other._close()
         self.popup.IsOpen = True
         if lst.SelectedItem is not None:
             lst.ScrollIntoView(lst.SelectedItem)
@@ -748,6 +758,17 @@ class AutoCompletePicker(object):
         # the list would stay behind on screen (StaysOpen), so close it
         if self.popup.IsOpen:
             self._close()
+
+    def _on_window_mouse_down(self, sender, e):
+        """A click anywhere else in the window closes the list. (Clicks in the
+        list itself never get here: the popup is its own window.) Not handled,
+        so the click still does what it normally does."""
+        if not self.popup.IsOpen:
+            return
+        src = e.OriginalSource
+        if find_ancestor(src, TextBox) is self.box or find_ancestor(src, Button) is self.arrow:
+            return                  # the box handles its own clicks, the arrow toggles
+        self._close()
 
 
 class OvzWindow(forms.WPFWindow):
