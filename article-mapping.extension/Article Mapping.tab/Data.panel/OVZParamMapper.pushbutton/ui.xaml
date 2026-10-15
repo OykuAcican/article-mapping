@@ -467,7 +467,38 @@
                             </WrapPanel>
                             <WrapPanel Margin="0,4,0,0">
                                 <TextBlock Text="Drag value from column" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="0,0,8,4"/>
-                                <ComboBox x:Name="value_cb" Width="240" Padding="6,3" Margin="0,0,0,4"/>
+                                <Grid Margin="0,0,0,4">
+                                    <TextBox x:Name="value_box" Width="240" Padding="6,3,22,3" BorderBrush="{StaticResource Line}"
+                                             ToolTip="Column whose value is dragged. Type to search."/>
+                                    <!-- flat arrow button; not focusable so the typing focus stays in value_box -->
+                                    <Button x:Name="value_arrow" Content="&#x25BE;" Foreground="{StaticResource Muted}"
+                                            HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,3,0"
+                                            Padding="5,0" Cursor="Hand" Focusable="False" ToolTip="Show all columns">
+                                        <Button.Template>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border Background="Transparent" Padding="{TemplateBinding Padding}">
+                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Border>
+                                            </ControlTemplate>
+                                        </Button.Template>
+                                    </Button>
+                                    <!-- StaysOpen True: script.py closes it (choice, Escape, focus leaves, window moves) -->
+                                    <Popup x:Name="value_popup" PlacementTarget="{Binding ElementName=value_box}" Placement="Bottom"
+                                           StaysOpen="True" AllowsTransparency="True">
+                                        <Border Background="White" BorderBrush="{StaticResource Line}" BorderThickness="1">
+                                            <!-- not focusable: the typing focus stays in value_box -->
+                                            <ListBox x:Name="value_list" MaxHeight="400" BorderThickness="0" Focusable="False"
+                                                     Width="{Binding ActualWidth, ElementName=value_box}">
+                                                <ListBox.ItemContainerStyle>
+                                                    <Style TargetType="ListBoxItem">
+                                                        <Setter Property="Focusable" Value="False"/>
+                                                        <Setter Property="Padding" Value="6,3"/>
+                                                    </Style>
+                                                </ListBox.ItemContainerStyle>
+                                            </ListBox>
+                                        </Border>
+                                    </Popup>
+                                </Grid>
                             </WrapPanel>
                         </StackPanel>
                     </Border>

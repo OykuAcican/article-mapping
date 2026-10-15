@@ -562,6 +562,194 @@ def esc(text):
     return text.replace("'", "''")
 
 
+class AutoCompletePicker(object):
+    """A TextBox with a ▾ button and a list popup: type part of a name or open
+    the whole list. The popup has StaysOpen True; this class closes it itself
+    (choice, Escape, focus leaves, window moved or deactivated) and then puts
+    back the current name, so no half-typed text is left behind."""
+
+    def __init__(self, window, box, arrow, popup, listbox, on_choose,
+                 empty_text='No matching item'):
+        self.window, self.box, self.arrow = window, box, arrow
+        self.popup, self.list = popup, listbox
+        self.on_choose = on_choose
+        self.empty_text = empty_text
+        self.names = []            # priority items first, otherwise in the given order
+        self.current = ''
+        self._setting = False      # box text set by code, not typed
+        for ev, handler in ((box.PreviewMouseLeftButtonDown, self._on_mouse_down),
+                            (box.PreviewMouseLeftButtonUp, self._on_click),
+                            (box.GotKeyboardFocus, self._on_got_focus),
+                            (box.TextChanged, self._on_text_changed),
+                            (box.PreviewKeyDown, self._on_key),
+                            (box.LostKeyboardFocus, self._on_lost_focus),
+                            (arrow.Click, self._on_arrow),
+                            (listbox.PreviewMouseLeftButtonUp, self._on_list_click),
+                            (window.LocationChanged, self._on_window_moved),
+                            (window.Deactivated, self._on_window_moved)):
+            ev += handler
+
+    # -- called by the window ---------------------------------------------------------
+    def set_items(self, items, current):
+        """items: list of (name, is_priority). Priority items come first."""
+        ordered = sorted(enumerate(items), key=lambda x: (not x[1][1], x[0]))
+        self.names = [name for _, (name, _p) in ordered]
+        self.set_current(current)
+
+    def set_current(self, name):
+        self.current = name
+        self._set_text(name)
+
+    # -- internals ----------------------------------------------------------------------
+    def _set_text(self, text):
+        self._setting = True
+        self.box.Text = text
+        self._setting = False
+
+    def _later(self, func):
+        """Run func after the current mouse/focus event has finished."""
+        self.window.Dispatcher.BeginInvoke(Action(func))
+
+    def _matches(self, text):
+        """Names containing text: exact match, then starts with, then contains."""
+        t = (text or '').strip().lower()
+        if not t:
+            return list(self.names)
+        exact, start, inside = [], [], []
+        for n in self.names:                    # already priority first
+            low = n.lower()
+            if low == t:
+                exact.append(n)
+            elif low.startswith(t):
+                start.append(n)
+            elif t in low:
+                inside.append(n)
+        return exact + start + inside
+
+    def _show(self, names, select=None):
+        lst = self.list
+        if names:
+            lst.ItemsSource = names
+            lst.SelectedIndex = names.index(select) if select in names else 0
+        else:
+            item = ListBoxItem()
+            item.Content = self.empty_text
+            item.IsEnabled = False
+            lst.ItemsSource = [item]
+            lst.SelectedIndex = -1
+        self.popup.IsOpen = True
+        if lst.SelectedItem is not None:
+            lst.ScrollIntoView(lst.SelectedItem)
+
+    def _show_full(self):
+        self._show(list(self.names), self.current)
+
+    def _open_full(self):
+        if not self.popup.IsOpen:
+            self._show_full()
+
+    def _close(self):
+        """Close the list and put back the current name."""
+        self.popup.IsOpen = False
+        self._set_text(self.current)
+
+    def _move(self, step):
+        if not self.popup.IsOpen:
+            text = self.box.Text
+            if text == self.current:
+                self._show_full()
+            else:
+                self._show(self._matches(text))
+            return
+        lst = self.list
+        if not lst.Items.Count or not isinstance(lst.Items[0], str):
+            return                              # "No matching ..."
+        i = max(0, min(lst.Items.Count - 1, lst.SelectedIndex + step))
+        lst.SelectedIndex = i
+        lst.ScrollIntoView(lst.Items[i])
+
+    def _choose_highlighted(self):
+        item = self.list.SelectedItem
+        if self.popup.IsOpen and isinstance(item, str):
+            self._choose(item)
+            return True
+        return False
+
+    def _choose(self, name):
+        self.popup.IsOpen = False
+        self._set_text(name)
+        self.box.SelectAll()
+        if name == self.current:
+            return
+        self.current = name
+        self.on_choose(name)
+
+    # -- events ---------------------------------------------------------------------------
+    def _on_mouse_down(self, sender, e):
+        # first click: take the focus here, so GotFocus can select all text
+        # (otherwise the click itself would put the caret and undo the selection)
+        if not self.box.IsKeyboardFocusWithin:
+            self.box.Focus()
+            e.Handled = True
+
+    def _on_click(self, sender, e):
+        # (when the list is already open, a click only moves the caret)
+        self._later(self._open_full)
+
+    def _on_got_focus(self, sender, e):
+        self.box.SelectAll()
+        self._later(self._open_full)
+
+    def _on_text_changed(self, sender, e):
+        if self._setting or not self.box.IsKeyboardFocusWithin:
+            return
+        self._show(self._matches(self.box.Text))
+
+    def _on_key(self, sender, e):
+        if e.Key == Key.Down:
+            self._move(1)
+            e.Handled = True
+        elif e.Key == Key.Up:
+            self._move(-1)
+            e.Handled = True
+        elif e.Key == Key.Enter:
+            self._choose_highlighted()
+            e.Handled = True
+        elif e.Key == Key.Tab:
+            self._choose_highlighted()          # Tab still moves on to the next field
+        elif e.Key == Key.Escape:
+            self._close()
+            self.box.SelectAll()
+            e.Handled = True
+
+    def _on_list_click(self, sender, e):
+        item = find_ancestor(e.OriginalSource, ListBoxItem)
+        if item is not None and item.IsEnabled and isinstance(item.Content, str):
+            self._choose(item.Content)
+            e.Handled = True
+
+    def _on_arrow(self, sender, e):
+        """Toggle the full list."""
+        if self.popup.IsOpen:
+            self.popup.IsOpen = False
+            return
+        self.box.Focus()
+        self.box.SelectAll()
+        self._later(self._open_full)
+
+    def _on_lost_focus(self, sender, e):
+        # check once the new focus is known; never leave half-typed text behind
+        def check():
+            if not (self.box.IsKeyboardFocusWithin or self.list.IsKeyboardFocusWithin):
+                self._close()
+        self._later(check)
+
+    def _on_window_moved(self, sender, e):
+        # the list would stay behind on screen (StaysOpen), so close it
+        if self.popup.IsOpen:
+            self._close()
+
+
 class OvzWindow(forms.WPFWindow):
     def __init__(self):
         forms.WPFWindow.__init__(self, XAML_FILE)
@@ -596,9 +784,13 @@ class OvzWindow(forms.WPFWindow):
         self._art_col = {}
         self.art_columns = []
         self.art_values = {}
-        self._loading_target = False
-        self._setting_target = False   # target_box text set by code, not typed
-        self._target_names = []        # Fill parameter choices, shared first
+        # autocomplete pickers: Fill parameter (left) and Drag value from column (right)
+        self.target_picker = AutoCompletePicker(
+            self, self.target_box, self.target_arrow, self.target_popup, self.target_list,
+            self._on_target_chosen, 'No matching parameter')
+        self.value_picker = AutoCompletePicker(
+            self, self.value_box, self.value_arrow, self.value_popup, self.value_list,
+            self._on_value_col_chosen, 'No matching column')
         self._el_to_group = {}
         self._own_selection = set()
         self._sel_callback = None
@@ -646,17 +838,6 @@ class OvzWindow(forms.WPFWindow):
                             (self.only_unassigned_cb.Click, self.on_model_filter),
                             (self.hide_noparam_cb.Click, self.on_hide_noparam),
                             (self.art_search.TextChanged, self.on_art_filter),
-                            (self.target_box.PreviewMouseLeftButtonDown, self.on_target_mouse_down),
-                            (self.target_box.PreviewMouseLeftButtonUp, self.on_target_click),
-                            (self.target_box.GotKeyboardFocus, self.on_target_got_focus),
-                            (self.target_box.TextChanged, self.on_target_text_changed),
-                            (self.target_box.PreviewKeyDown, self.on_target_key),
-                            (self.target_box.LostKeyboardFocus, self.on_target_lost_focus),
-                            (self.target_arrow.Click, self.on_target_arrow),
-                            (self.target_list.PreviewMouseLeftButtonUp, self.on_target_list_click),
-                            (self.LocationChanged, self.on_window_moved),
-                            (self.Deactivated, self.on_window_moved),
-                            (self.value_cb.SelectionChanged, self.on_value_col_changed),
                             (self.sub_cb.SelectionChanged, self.on_art_filter),
                             (self.model_grid.AutoGeneratingColumn, self.on_auto_column),
                             (self.art_grid.AutoGeneratingColumn, self.on_auto_column),
@@ -691,12 +872,10 @@ class OvzWindow(forms.WPFWindow):
             forms.alert('Could not read the article list. If it is open in Excel, '
                         'save it and try again.\n\n{}'.format(ex))
             return
-        self._loading_target = True
-        self.value_cb.ItemsSource = self.art_columns
         if self.value_col not in self.art_columns:
             self.value_col = self.art_columns[0] if self.art_columns else ART_CODE_COL
-        self.value_cb.SelectedItem = self.value_col
-        self._loading_target = False
+        # Excel order, no priority items
+        self.value_picker.set_items([(c, False) for c in self.art_columns], self.value_col)
         subs = sorted(set(a[3] for a in self.art_list if a[3]))
         self.sub_cb.ItemsSource = [ALL_SUBS] + subs
         self.sub_cb.SelectedIndex = 0
@@ -725,10 +904,8 @@ class OvzWindow(forms.WPFWindow):
         self.art_grid.ItemsSource = dt.DefaultView
         self._art_filter()
 
-    def on_value_col_changed(self, sender, e):
-        if self._loading_target or self.value_cb.SelectedItem is None:
-            return
-        self.value_col = self.value_cb.SelectedItem
+    def _on_value_col_chosen(self, name):
+        self.value_col = name
         config.ovz_value_column = self.value_col
         script.save_config()
         self._build_art_table()
@@ -866,79 +1043,12 @@ class OvzWindow(forms.WPFWindow):
         shared = dict(names)
         shared.setdefault(P_INST, False)
         shared.setdefault(self.target, False)
-        # shared parameters first, then the others, each A-Z
-        self._target_names = sorted(shared, key=lambda n: (not shared[n], n.lower()))
-        self._set_target_text(self.target)
-        self.target_info.Text = '{} parameters'.format(len(self._target_names))
+        # shared parameters first (priority), then the others, each A-Z
+        items = [(n, shared[n]) for n in sorted(shared, key=lambda n: n.lower())]
+        self.target_picker.set_items(items, self.target)
+        self.target_info.Text = '{} parameters'.format(len(items))
 
-    def _set_target_text(self, text):
-        """Set the box text from code (not treated as typing)."""
-        self._setting_target = True
-        self.target_box.Text = text
-        self._setting_target = False
-
-    def _target_matches(self, text):
-        """Names containing text: exact match, then starts with, then contains."""
-        t = (text or '').strip().lower()
-        if not t:
-            return list(self._target_names)
-        exact, start, inside = [], [], []
-        for n in self._target_names:           # already shared first, then A-Z
-            low = n.lower()
-            if low == t:
-                exact.append(n)
-            elif low.startswith(t):
-                start.append(n)
-            elif t in low:
-                inside.append(n)
-        return exact + start + inside
-
-    def _show_target_list(self, names, select=None):
-        lst = self.target_list
-        if names:
-            lst.ItemsSource = names
-            lst.SelectedIndex = names.index(select) if select in names else 0
-        else:
-            item = ListBoxItem()
-            item.Content = 'No matching parameter'
-            item.IsEnabled = False
-            lst.ItemsSource = [item]
-            lst.SelectedIndex = -1
-        self.target_popup.IsOpen = True
-        if lst.SelectedItem is not None:
-            lst.ScrollIntoView(lst.SelectedItem)
-
-    def _show_full_target_list(self):
-        self._show_target_list(list(self._target_names), self.target)
-
-    def _move_target_highlight(self, step):
-        if not self.target_popup.IsOpen:
-            text = self.target_box.Text
-            if text == self.target:
-                self._show_full_target_list()
-            else:
-                self._show_target_list(self._target_matches(text))
-            return
-        lst = self.target_list
-        if not lst.Items.Count or not isinstance(lst.Items[0], str):
-            return                              # "No matching parameter"
-        i = max(0, min(lst.Items.Count - 1, lst.SelectedIndex + step))
-        lst.SelectedIndex = i
-        lst.ScrollIntoView(lst.Items[i])
-
-    def _choose_highlighted_target(self):
-        item = self.target_list.SelectedItem
-        if self.target_popup.IsOpen and isinstance(item, str):
-            self._choose_target(item)
-            return True
-        return False
-
-    def _choose_target(self, name):
-        self.target_popup.IsOpen = False
-        self._set_target_text(name)
-        self.target_box.SelectAll()
-        if name == self.target:
-            return
+    def _on_target_chosen(self, name):
         self.target = name
         config.ovz_target = name
         script.save_config()
@@ -947,84 +1057,6 @@ class OvzWindow(forms.WPFWindow):
             self.load_model()
             self._set_status('Now filling "{}"'.format(self.target))
         self._run(run)
-
-    def on_target_mouse_down(self, sender, e):
-        # first click: take the focus here, so GotFocus can select all text
-        # (otherwise the click itself would put the caret and undo the selection)
-        if not self.target_box.IsKeyboardFocusWithin:
-            self.target_box.Focus()
-            e.Handled = True
-
-    def _later(self, func):
-        """Run func after the current mouse/focus event has finished."""
-        self.Dispatcher.BeginInvoke(Action(func))
-
-    def _open_full_target_list(self):
-        if not self.target_popup.IsOpen:
-            self._show_full_target_list()
-
-    def _close_target_popup(self):
-        """Close the list and put back the current parameter name."""
-        self.target_popup.IsOpen = False
-        self._set_target_text(self.target)
-
-    def on_target_click(self, sender, e):
-        # (when the list is already open, a click only moves the caret)
-        self._later(self._open_full_target_list)
-
-    def on_target_got_focus(self, sender, e):
-        self.target_box.SelectAll()
-        self._later(self._open_full_target_list)
-
-    def on_target_text_changed(self, sender, e):
-        if self._setting_target or not self.target_box.IsKeyboardFocusWithin:
-            return
-        self._show_target_list(self._target_matches(self.target_box.Text))
-
-    def on_target_key(self, sender, e):
-        if e.Key == Key.Down:
-            self._move_target_highlight(1)
-            e.Handled = True
-        elif e.Key == Key.Up:
-            self._move_target_highlight(-1)
-            e.Handled = True
-        elif e.Key == Key.Enter:
-            self._choose_highlighted_target()
-            e.Handled = True
-        elif e.Key == Key.Tab:
-            self._choose_highlighted_target()     # Tab still moves on to the next field
-        elif e.Key == Key.Escape:
-            self._close_target_popup()
-            self.target_box.SelectAll()
-            e.Handled = True
-
-    def on_target_list_click(self, sender, e):
-        item = find_ancestor(e.OriginalSource, ListBoxItem)
-        if item is not None and item.IsEnabled and isinstance(item.Content, str):
-            self._choose_target(item.Content)
-            e.Handled = True
-
-    def on_target_arrow(self, sender, e):
-        """Toggle the full list."""
-        if self.target_popup.IsOpen:
-            self.target_popup.IsOpen = False
-            return
-        self.target_box.Focus()
-        self.target_box.SelectAll()
-        self._later(self._open_full_target_list)
-
-    def on_target_lost_focus(self, sender, e):
-        # check once the new focus is known; never leave half-typed text behind
-        def check():
-            if not (self.target_box.IsKeyboardFocusWithin
-                    or self.target_list.IsKeyboardFocusWithin):
-                self._close_target_popup()
-        self._later(check)
-
-    def on_window_moved(self, sender, e):
-        # the list would stay behind on screen (StaysOpen), so close it
-        if self.target_popup.IsOpen:
-            self._close_target_popup()
 
     def _mkey(self, g, system=None):
         return make_key(g.category, g.family, g.type,
