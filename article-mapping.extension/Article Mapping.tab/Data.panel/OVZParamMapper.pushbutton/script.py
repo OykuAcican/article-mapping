@@ -114,7 +114,9 @@ MODEL_COLS = ['Category', 'Family', 'Type', 'System Type', 'System Abbreviation'
               'Elements', 'Elements without value', 'OVZ_Keynote now', 'Article', 'Description',
               'System Classification', 'Shape']
 # column order on screen (indexes into MODEL_COLS)
-DISPLAY_ORDER = [0, 1, 2, 11, 3, 4, 5, 6, 7, 8, 9, 10, 12]
+DISPLAY_ORDER = [0, 1, 2, 11, 3, 5, 6, 7, 8, 9, 10, 12]
+# kept in the table (search, mapping key) but not shown: g4 = System Abbreviation
+HIDDEN_MODEL_COLS = ('g4',)
 COL_TIPS = {'g6': 'Number of elements in this row',
             'g7': 'Elements in this row whose parameter is empty',
             'g8': 'What is in Revit now for this parameter',
@@ -123,13 +125,15 @@ COL_TIPS = {'g6': 'Number of elements in this row',
             'g10': 'Article (row) in the Excel list the new value comes from'}
 NONE_FIELD = '(none)'
 # Category is always the first group level; these are the choices below it
+# (the abbreviation is still read for the mapping key, it is just not offered here)
 GROUP_FIELDS = ['Family', 'Type', 'System Classification', 'System Type',
-                'System Abbreviation', 'Size', 'Diameter', 'Width', 'Height', 'Shape']
-DEFAULT_GROUPING = ['Type', 'System Abbreviation', 'Size']
-# names used in saved settings before they matched Revit
+                'Size', 'Diameter', 'Width', 'Height', 'Shape']
+DEFAULT_GROUPING = ['Type', 'System Classification', 'Size']
+# names used in saved settings before: old spelling, or the abbreviation (no longer offered)
 OLD_FIELD_NAMES = {'System classification': 'System Classification',
                    'System type': 'System Type',
-                   'System abbreviation': 'System Abbreviation'}
+                   'System abbreviation': 'System Classification',
+                   'System Abbreviation': 'System Classification'}
 SHAPE_ORDER = {'Round': 0, 'Rectangular': 1, 'Oval': 2}
 ART_COLS = ['Art_nr', 'Omschrijving', 'Unit', 'Discipline']
 GROUP_KEY_COLS = ('k0', 'k1', 'k2', 'k3')
@@ -285,11 +289,13 @@ class Group(object):
 
 
 # Not physical model elements: views/sheets/cameras, materials, project info,
-# links, imports, datums, lines... (view-specific items like detail items are
-# skipped separately)
+# links, imports, datums, lines, MEP system definitions (Duct/Piping Systems,
+# electrical circuits)... (view-specific items like detail items are skipped
+# separately)
 SKIP_CLASSES = (DB.View, DB.Material, DB.ProjectInfo, DB.RevitLinkInstance,
                 DB.ImportInstance, DB.Family, DB.Level, DB.Grid, DB.ReferencePlane,
-                DB.SketchPlane, DB.CurveElement, DB.ProjectLocation, DB.BasePoint)
+                DB.SketchPlane, DB.CurveElement, DB.ProjectLocation, DB.BasePoint,
+                DB.MEPSystem)
 
 
 def split_target(target):
@@ -1134,7 +1140,8 @@ class OvzWindow(forms.WPFWindow):
 
     # -- events: columns, filters ------------------------------------------------------
     def on_auto_column(self, sender, e):
-        if e.PropertyName in HIDDEN_COLS:
+        if e.PropertyName in HIDDEN_COLS or (sender.Name == 'model_grid'
+                                             and e.PropertyName in HIDDEN_MODEL_COLS):
             e.Cancel = True
             return
         # a TextBlock shows underscores literally (a plain string would hide them)
