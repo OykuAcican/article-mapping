@@ -109,16 +109,27 @@ _DISC_CATS = {
     'Fire protection': ['Sprinklers', 'Fire Alarm Devices', 'Fire Protection'],
 }
 DISCIPLINE_OF = dict((c, d) for d, cats in _DISC_CATS.items() for c in cats)
-MODEL_COLS = ['Category', 'Family', 'Type', 'System type', 'Abbrev.', 'Size',
-              'Count', 'Empty', 'OVZ_Keynote now', 'Article', 'Description',
-              'Classification', 'Shape']
+# header texts use Revit's parameter names; g8-g10 are set per target in _build_model_table
+MODEL_COLS = ['Category', 'Family', 'Type', 'System Type', 'System Abbreviation', 'Size',
+              'Elements', 'Elements without value', 'OVZ_Keynote now', 'Article', 'Description',
+              'System Classification', 'Shape']
 # column order on screen (indexes into MODEL_COLS)
-DISPLAY_ORDER = [0, 1, 2, 11, 3, 4, 12, 5, 6, 7, 8, 9, 10]
+DISPLAY_ORDER = [0, 1, 2, 11, 3, 4, 5, 6, 7, 8, 9, 10, 12]
+COL_TIPS = {'g6': 'Number of elements in this row',
+            'g7': 'Elements in this row whose parameter is empty',
+            'g8': 'What is in Revit now for this parameter',
+            'g9': 'Value you dragged from Excel. It is written to Revit when you click '
+                  'Apply to model',
+            'g10': 'Article (row) in the Excel list the new value comes from'}
 NONE_FIELD = '(none)'
 # Category is always the first group level; these are the choices below it
-GROUP_FIELDS = ['Family', 'Type', 'System classification', 'System type',
-                'System abbreviation', 'Shape', 'Size', 'Diameter', 'Width', 'Height']
-DEFAULT_GROUPING = ['Type', 'System abbreviation', 'Size']
+GROUP_FIELDS = ['Family', 'Type', 'System Classification', 'System Type',
+                'System Abbreviation', 'Size', 'Diameter', 'Width', 'Height', 'Shape']
+DEFAULT_GROUPING = ['Type', 'System Abbreviation', 'Size']
+# names used in saved settings before they matched Revit
+OLD_FIELD_NAMES = {'System classification': 'System Classification',
+                   'System type': 'System Type',
+                   'System abbreviation': 'System Abbreviation'}
 SHAPE_ORDER = {'Round': 0, 'Rectangular': 1, 'Oval': 2}
 ART_COLS = ['Art_nr', 'Omschrijving', 'Unit', 'Discipline']
 GROUP_KEY_COLS = ('k0', 'k1', 'k2', 'k3')
@@ -434,11 +445,11 @@ def group_value(g, field):
         v = g.family
     elif field == 'Type':
         v = g.type
-    elif field == 'System classification':
+    elif field == 'System Classification':
         v = g.classification
-    elif field == 'System type':
+    elif field == 'System Type':
         v = g.systype
-    elif field == 'System abbreviation':
+    elif field == 'System Abbreviation':
         v = g.abbr
     elif field == 'Shape':
         v = g.shape
@@ -543,6 +554,7 @@ class OvzWindow(forms.WPFWindow):
         # older settings had 4 levels starting with Category: use the default then
         if len(saved) != 3 or saved[0] == 'Category':
             saved = DEFAULT_GROUPING
+        saved = [OLD_FIELD_NAMES.get(v, v) for v in saved]
         for cb, value in zip(self._group_cbs, saved):
             cb.ItemsSource = [NONE_FIELD] + GROUP_FIELDS
             cb.SelectedItem = value if value in GROUP_FIELDS else NONE_FIELD
@@ -719,9 +731,9 @@ class OvzWindow(forms.WPFWindow):
             else:
                 dt.Columns.Add(name)
         cols = list(MODEL_COLS) + self.extra_names
-        cols[8] = u'{} now'.format(self.target)
-        cols[9] = 'New value'
-        cols[10] = 'From article'
+        cols[8] = u'{} – current value in model'.format(self.target)
+        cols[9] = u'{} – new value (not applied yet)'.format(self.target)
+        cols[10] = 'Source article (Excel)'
         for i, h in enumerate(cols):
             dt.Columns.Add('g{}'.format(i))
             self._headers['g{}'.format(i)] = h
@@ -836,7 +848,10 @@ class OvzWindow(forms.WPFWindow):
                     # tuples (compared by value) fall in the same group
                     label = vals[0][0].upper() if lvl == 0 else vals[lvl][0]
                     n = counts[pre]
-                    count_text = '1 element' if n == 1 else '{} elements'.format(n)
+                    if lvl > 0 and n == counts[pre[:-1]]:
+                        count_text = ''         # same as the header above: don't repeat it
+                    else:
+                        count_text = '1 element' if n == 1 else '{} elements'.format(n)
                     dr['k{}'.format(lvl)] = Tuple.Create(label, count_text)
                     dr['s{}'.format(lvl)] = vals[lvl][1]
                 else:
@@ -1126,6 +1141,8 @@ class OvzWindow(forms.WPFWindow):
         header = TextBlock()
         header.Text = self._headers.get(e.PropertyName, e.PropertyName)
         e.Column.Header = header
+        if sender.Name == 'model_grid' and e.PropertyName in COL_TIPS:
+            header.ToolTip = COL_TIPS[e.PropertyName]
         if sender.Name == 'art_grid':
             e.Column.MaxWidth = 420
             if e.PropertyName == getattr(self, '_art_col', {}).get(self.value_col):
