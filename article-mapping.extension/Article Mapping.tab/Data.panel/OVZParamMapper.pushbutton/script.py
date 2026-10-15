@@ -118,8 +118,8 @@ DISPLAY_ORDER = [0, 1, 2, 11, 3, 4, 5, 6, 7, 8, 9, 10, 12]
 COL_TIPS = {'g6': 'Number of elements in this row',
             'g7': 'Elements in this row whose parameter is empty',
             'g8': 'What is in Revit now for this parameter',
-            'g9': 'Value you dragged from Excel. It is written to Revit when you click '
-                  'Apply to model',
+            'g9': 'Value you dragged from the Excel list. It is written to Revit when '
+                  'you click Apply to model.',
             'g10': 'Article (row) in the Excel list the new value comes from'}
 NONE_FIELD = '(none)'
 # Category is always the first group level; these are the choices below it
@@ -731,8 +731,8 @@ class OvzWindow(forms.WPFWindow):
             else:
                 dt.Columns.Add(name)
         cols = list(MODEL_COLS) + self.extra_names
-        cols[8] = u'{} – current value in model'.format(self.target)
-        cols[9] = u'{} – new value (not applied yet)'.format(self.target)
+        cols[8] = u'{} (current value in model)'.format(self.target)
+        cols[9] = u'{} (new value, dragged from Excel)'.format(self.target)
         cols[10] = 'Source article (Excel)'
         for i, h in enumerate(cols):
             dt.Columns.Add('g{}'.format(i))
@@ -851,7 +851,7 @@ class OvzWindow(forms.WPFWindow):
                     if lvl > 0 and n == counts[pre[:-1]]:
                         count_text = ''         # same as the header above: don't repeat it
                     else:
-                        count_text = '1 element' if n == 1 else '{} elements'.format(n)
+                        count_text = '(1 element)' if n == 1 else '({} elements)'.format(n)
                     dr['k{}'.format(lvl)] = Tuple.Create(label, count_text)
                     dr['s{}'.format(lvl)] = vals[lvl][1]
                 else:
